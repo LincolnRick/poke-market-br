@@ -1,0 +1,131 @@
+{% extends "layout.html" %}
+{% block content %}
+<section style="max-width: 1100px; margin: 0 auto;">
+  <header style="display:flex; align-items: baseline; gap: 12px; margin-bottom: 12px;">
+    <h2 style="margin: 0;">Carta / Termo: {{ query }}</h2>
+    <nav style="font-size:.9rem; color:#666;">
+      Intervalo:
+      <a href="{{ url_for('card_view', query=query, days=30) }}" style="margin-left:6px; text-decoration:none;">30d</a> ·
+      <a href="{{ url_for('card_view', query=query, days=90) }}" style="text-decoration:none;">90d</a> ·
+      <a href="{{ url_for('card_view', query=query, days=180) }}" style="text-decoration:none;">180d</a> ·
+      <a href="{{ url_for('card_view', query=query, days=365) }}" style="text-decoration:none;">365d</a>
+    </nav>
+  </header>
+
+  <div style="border:1px solid #eee; border-radius:12px; padding:14px;">
+    <canvas id="chart" height="120"></canvas>
+  </div>
+
+  <h3 style="margin: 18px 0 8px;">Últimos registros</h3>
+  {% if items and items|length %}
+    <div style="overflow:auto;">
+      <table style="width:100%; border-collapse: collapse;">
+        <thead>
+          <tr style="text-align:left; border-bottom:1px solid #eee;">
+            <th style="padding:8px 6px; white-space:nowrap;">Quando</th>
+            <th style="padding:8px 6px; white-space:nowrap;">Min (R$)</th>
+            <th style="padding:8px 6px; white-space:nowrap;">Máx (R$)</th>
+            <th style="padding:8px 6px; white-space:nowrap;">Médio (R$)</th>
+            <th style="padding:8px 6px; white-space:nowrap;">Fonte</th>
+            <th style="padding:8px 6px;">Título</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in items %}
+            <tr style="border-bottom:1px solid #f2f2f2;">
+              <td style="padding:8px 6px; white-space:nowrap;">{{ p.captured_at }}</td>
+              <td style="padding:8px 6px; white-space:nowrap;">{{ '%.2f'|format(p.price_min_brl) }}</td>
+              <td style="padding:8px 6px; white-space:nowrap;">{{ '%.2f'|format(p.price_max_brl) }}</td>
+              <td style="padding:8px 6px; white-space:nowrap;">{{ '%.2f'|format(p.price_brl) }}</td>
+              <td style="padding:8px 6px; white-space:nowrap;">{{ p.source }}</td>
+              <td style="padding:8px 6px;">
+                <a href="{{ p.url }}" target="_blank" rel="noopener" style="text-decoration:none;">
+                  {{ p.title }}
+                </a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div style="border:1px dashed #ccc; border-radius:8px; padding:10px 12px; color:#666;">
+      Ainda não há registros para este termo.
+    </div>
+  {% endif %}
+</section>
+
+<script>
+  // Dados vindos do backend: cada ponto tem t, y_min, y_max, y_mid
+  const points = {{ points|tojson }};
+
+  // Prepara labels e séries
+  const labels = points.map(p => new Date(p.t));
+  const lo  = points.map(p => p.y_min);
+  const hi  = points.map(p => p.y_max);
+  const mid = points.map(p => p.y_mid);
+
+  const ctx = document.getElementById('chart').getContext('2d');
+
+  // Para destacar a faixa min→máx, usamos dois datasets:
+  // 1) lower (mínimo), 2) upper (máximo) com fill:'-1' (preenche até o dataset anterior)
+  // 3) linha do médio por cima.
+  const chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Mínimo',
+          data: lo,
+          pointRadius: 0,
+          borderWidth: 0,
+        },
+        {
+          label: 'Faixa (min→máx)',
+          data: hi,
+          pointRadius: 0,
+          borderWidth: 0,
+          fill: '-1',
+          backgroundColor: 'rgba(99, 132, 255, 0.18)',
+        },
+        {
+          label: 'Médio (R$)',
+          data: mid,
+          tension: 0.3,
+          pointRadius: 0,
+          borderWidth: 2,
+        },
+      ],
+    },
+    options: {
+      parsing: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: true },
+        tooltip: {
+          callbacks: {
+            // Mostra min/máx/médio no tooltip de um único ponto
+            label: function(ctx) {
+              const i = ctx.dataIndex;
+              if (i == null) return ctx.formattedValue;
+              const vMin = lo[i];
+              const vMax = hi[i];
+              const vMid = mid[i];
+              return [
+                `Médio: R$ ${vMid.toFixed(2)}`,
+                `Min:   R$ ${vMin.toFixed(2)}`,
+                `Máx:   R$ ${vMax.toFixed(2)}`
+              ];
+            }
+          }
+        }
+      },
+      scales: {
+        x: { type: 'time', time: { unit: 'day' } },
+        y: { beginAtZero: false }
+      }
+    }
+  });
+</script>
+{% endblock %}

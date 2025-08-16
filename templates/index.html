@@ -1,0 +1,185 @@
+{% extends "layout.html" %}
+{% block title %}Dashboard • Collectr{% endblock %}
+
+{% block content %}
+<!-- =========================
+     BUSCA RÁPIDA
+========================= -->
+<section class="mb-6">
+  <div class="card p-4">
+    <div class="flex items-center justify-between gap-3">
+      <h2 class="font-bold text-lg">Buscar rápido</h2>
+      <form action="{{ url_for('seed_minimal') }}" method="post" class="ml-auto">
+        <button class="btn btn-soft" title="Adicionar dados de exemplo">Seed Demo</button>
+      </form>
+    </div>
+    <form action="{{ url_for('cards') }}" method="get" class="mt-3 grid grid-cols-1 md:grid-cols-6 gap-3 items-end">
+      <div class="md:col-span-4">
+        <label class="text-xs text-slate-600">Nome da carta</label>
+        <input name="q" placeholder="Ex.: Psyduck, Charizard, Gardevoir ex" autocomplete="off">
+      </div>
+      <label class="inline-flex items-center gap-2">
+        <input type="checkbox" name="only_missing">
+        <span class="text-sm">Apenas não possuídas</span>
+      </label>
+      <div>
+        <button class="btn w-full">Buscar</button>
+      </div>
+    </form>
+  </div>
+</section>
+
+<!-- =========================
+     OVERVIEW / KPIs
+========================= -->
+<section aria-labelledby="kpis" class="mb-6">
+  <h2 id="kpis" class="sr-only">Indicadores</h2>
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div class="card p-4" role="status" aria-label="Itens na coleção">
+      <div class="text-sm text-slate-500 flex items-center gap-2">
+        <span aria-hidden="true">📦</span> Itens na coleção
+      </div>
+      <div class="text-2xl font-extrabold mt-1">{{ total_itens }}</div>
+    </div>
+
+    <div class="card p-4" role="status" aria-label="Cartas únicas">
+      <div class="text-sm text-slate-500 flex items-center gap-2">
+        <span aria-hidden="true">🧮</span> Cartas únicas
+      </div>
+      <div class="text-2xl font-extrabold mt-1">{{ unique_cards }}</div>
+    </div>
+
+    <div class="card p-4" role="status" aria-label="Wishlist">
+      <div class="text-sm text-slate-500 flex items-center gap-2">
+        <span aria-hidden="true">⭐</span> Wishlist
+      </div>
+      <div class="text-2xl font-extrabold mt-1">{{ wishlist_count }}</div>
+    </div>
+
+    <div class="card p-4" role="status" aria-label="Valor estimado">
+      <div class="text-sm text-slate-500 flex items-center gap-2">
+        <span aria-hidden="true">💰</span> Valor estimado
+      </div>
+      <div class="text-2xl font-extrabold mt-1">R$ {{ '%.2f'|format(total_value) }}</div>
+      {% if (total_itens or 0) > 0 %}
+        <div class="text-xs text-slate-500 mt-1">
+          ~ R$ {{ '%.2f'|format(total_value / (total_itens or 1)) }} por item
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<!-- =========================
+     AÇÕES RÁPIDAS
+========================= -->
+<section aria-labelledby="quick-actions" class="mb-6">
+  <div class="card p-4">
+    <div class="flex items-center justify-between gap-3">
+      <h2 id="quick-actions" class="font-bold text-lg">Ações rápidas</h2>
+    </div>
+    <div class="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <a href="{{ url_for('cards') }}" class="btn text-center">Buscar cartas</a>
+      <a href="{{ url_for('collection_list') }}" class="btn btn-soft text-center">Ver coleção</a>
+      <a href="{{ url_for('wishlist') }}" class="btn btn-soft text-center">Ver wishlist</a>
+      <a href="{{ url_for('sets_page') }}" class="btn btn-soft text-center">Gerenciar sets</a>
+    </div>
+  </div>
+</section>
+
+<!-- =========================
+     PROGRESSO POR SET
+========================= -->
+<section aria-labelledby="progress" class="mb-6">
+  <div class="card p-4">
+    <div class="flex items-center justify-between">
+      <h2 id="progress" class="font-bold text-lg">Progresso por set</h2>
+      {% if progress and progress|length > 1 %}
+        <span class="text-xs text-slate-500">Ordenado por progresso</span>
+      {% endif %}
+    </div>
+
+    {% if progress and progress|length > 0 %}
+      <ul class="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {% for p in progress|sort(attribute='pct', reverse=True) %}
+          {% set raw = p.pct or 0 %}
+          {% set pct100 = (raw*100) if raw <= 1 else raw %}
+          <li>
+            <div class="p-3 border rounded">
+              <div class="flex items-center justify-between">
+                <div class="font-semibold truncate" title="{{ p.set.name }}">{{ p.set.name }}</div>
+                <a href="{{ url_for('set_view', set_id=p.set.id) }}" class="text-xs underline">ver set</a>
+              </div>
+              <div class="text-xs text-slate-500 mt-1">
+                {{ p.owned }}/{{ p.total }} cartas
+              </div>
+              <div class="mt-2">
+                <div class="h-3 rounded border">
+                  <div class="h-3 rounded" style="width: {{ '%.0f'|format(pct100) }}%; background: color-mix(in srgb, var(--accent) 65%, #fff 35%);"></div>
+                </div>
+                <div class="text-right text-[11px] mt-1">{{ '%.0f'|format(pct100) }}%</div>
+              </div>
+            </div>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <div class="mt-3 text-sm text-slate-500">Nenhum set com progresso para exibir.</div>
+    {% endif %}
+  </div>
+</section>
+
+<!-- =========================
+     ADICIONADOS RECENTEMENTE
+========================= -->
+<section aria-labelledby="recent">
+  <h2 id="recent" class="font-bold text-lg mb-3">Adicionados recentemente</h2>
+
+  {% if recent and recent|length > 0 %}
+    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+      {% for i in recent %}
+        <article class="card p-2">
+          <div class="relative">
+            {% if i.card.image_url %}
+              <img src="{{ i.card.image_url }}"
+                   alt="Imagem de {{ i.card.name }}"
+                   class="w-full aspect-[3/4] object-cover rounded-lg">
+            {% else %}
+              <div class="w-full aspect-[3/4] bg-slate-200 rounded-lg grid place-items-center text-slate-500">
+                sem imagem
+              </div>
+            {% endif %}
+            <span class="absolute top-2 left-2 chip">x{{ i.quantity }}</span>
+          </div>
+
+          <div class="mt-2">
+            <h3 class="text-sm font-semibold leading-tight truncate" title="{{ i.card.name }}">{{ i.card.name }}</h3>
+            <p class="text-xs text-slate-500 truncate">
+              {{ i.card.set.name }} • #{{ i.card.number or '—' }}
+            </p>
+            <p class="text-xs mt-1">
+              Estimado: <b>R$ {{ '%.2f'|format(i.unit_estimated_value) }}</b>
+              {% if i.quantity and i.quantity > 1 %}
+                (x{{ i.quantity }}) →
+                <b>R$ {{ '%.2f'|format(i.total_estimated_value) }}</b>
+              {% endif %}
+            </p>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="card p-4">
+      <p class="text-sm text-slate-500">
+        Sua coleção ainda está vazia. Use <b>Buscar cartas</b> para adicionar itens, ou gere alguns exemplos com <b>Seed Demo</b>.
+      </p>
+      <div class="mt-3 flex flex-wrap gap-2">
+        <a href="{{ url_for('cards') }}" class="btn">Buscar cartas</a>
+        <form action="{{ url_for('seed_minimal') }}" method="post">
+          <button class="btn btn-soft">Seed Demo</button>
+        </form>
+      </div>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

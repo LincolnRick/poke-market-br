@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Collectr{% endblock %}</title>
+
+  <!-- Fontes com vibe retrô -->
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+
+  <style>
+  /* ===========================
+     Tema Retrô (Pokémon / Game Boy) com paletas Green/Red/Blue
+     =========================== */
+  :root{
+    /* Carcaça do console (fixa) */
+    --shell:#bfb9ab;
+    --shell-dark:#8f8a7c;
+
+    /* Paleta base (GREEN = padrão) — pode ser sobrescrita por [data-theme] */
+    --screen:#CFE6A0;
+    --screen-deep:#9BBC0F;
+    --card:#e9f5c9;
+    --card-border:#96b30f;
+    --accent:#ffcc00;
+    --fg:#0F380F;
+    --muted:#314a31;
+
+    /* Marca (bolinha do logo) */
+    --mark-1:#ffd5d5;
+    --mark-2:#ff5a5a;
+
+    /* Fundo geral */
+    --bg:linear-gradient(0deg, rgba(0,0,0,.04), rgba(0,0,0,.04)) 0 0/8px 8px, var(--shell);
+  }
+
+  /* ===== Overrides por paleta ===== */
+  body[data-theme="red"]{
+    --screen:#F7D5D5;
+    --screen-deep:#D84C4C;
+    --card:#FFE9E9;
+    --card-border:#D87070;
+    --accent:#ff355b;
+    --fg:#3A1212;
+    --muted:#6e3a3a;
+    --mark-1:#ffd5d5;
+    --mark-2:#ff5a5a;
+  }
+  body[data-theme="blue"]{
+    --screen:#D3E9FF;
+    --screen-deep:#4198FF;
+    --card:#E8F2FF;
+    --card-border:#7AAAF7;
+    --accent:#3bb5ff;
+    --fg:#0f213a;
+    --muted:#37506e;
+    --mark-1:#bfe2ff;
+    --mark-2:#3aa0ff;
+  }
+  body[data-theme="green"]{
+    /* só p/ explicitar: já é o default do :root */
+  }
+
+  *{ box-sizing:border-box; }
+  html, body{ height:100%; }
+  body{
+    margin:0;
+    color:var(--fg);
+    background:var(--bg);
+    font-family: "VT323", monospace;
+    font-size: 18px;
+    line-height: 1.3;
+  }
+
+  /* ====== Topo (carcaça) ====== */
+  .topbar{
+    position:sticky; top:0; z-index:50;
+    background: linear-gradient(180deg, var(--shell), var(--shell-dark));
+    border-bottom: 4px solid var(--shell-dark);
+    padding: 14px 18px;
+  }
+  .brand{
+    display:flex; align-items:center; gap:12px;
+    text-decoration:none; color:#172217;
+  }
+  .brand .mark{
+    width:14px;height:14px;border-radius:50%;
+    background: radial-gradient(circle at 35% 35%, var(--mark-1) 0 30%, var(--mark-2) 31% 100%);
+    box-shadow: 0 0 0 3px #222 inset;
+  }
+  .brand .name{
+    font-family:"Press Start 2P", monospace;
+    font-size:12px; letter-spacing:.5px;
+  }
+  .nav{ display:flex; gap:10px; flex-wrap:wrap; }
+  .nav a{
+    text-decoration:none; color:#1a261a;
+    padding:6px 10px; border-radius:8px;
+    border:2px solid transparent;
+    font-family:"Press Start 2P", monospace;
+    font-size:10px;
+  }
+  .nav a:hover{ border-color:#3a3a3a; background:#dcd7cb; }
+  .nav a.active{ border-color:#3a3a3a; background:#d4cec2; }
+
+  /* ====== “Tela” verde/azul/vermelha ====== */
+  .screen{
+    max-width:1200px; margin:18px auto;
+    background: var(--screen);
+    border: 6px solid var(--screen-deep);
+    border-radius: 16px;
+    padding: 18px;
+    box-shadow: 0 3px 0 rgba(0,0,0,.25), 0 6px 0 rgba(0,0,0,.12);
+  }
+
+  /* ====== Utilitários usados nos templates ====== */
+
+  /* Cards com borda pixel */
+  .card{
+    background: var(--card);
+    border: 3px solid var(--card-border);
+    border-radius: 12px;
+    box-shadow: 0 2px 0 rgba(0,0,0,.15);
+  }
+  .p-2{padding:.5rem;} .p-3{padding:.75rem;} .p-6{padding:1.25rem;}
+  .mb-4{margin-bottom:1rem;} .mt-1{margin-top:.25rem;} .mt-2{margin-top:.5rem;} .mt-3{margin-top:.75rem;}
+  .w-full{width:100%;}
+  .relative{position:relative;}
+  .border{ border:3px solid var(--card-border); }
+  .border-t{ border-top:3px solid var(--card-border); }
+  .rounded{ border-radius:10px; }
+  .rounded-lg{ border-radius:12px; }
+  .rounded-xl{ border-radius:14px; }
+
+  /* Texto e cores utilitárias */
+  .font-semibold{ font-weight:700; }
+  .text-2xl{ font-size:20px; }
+  .text-xs{ font-size:12px; }
+  .text-[11px]{ font-size:11px; }
+  .text-slate-500{ color: var(--muted); }
+  .text-slate-600{ color: #264626; }
+  .text-slate-400{ color: #3d633d; }
+  .truncate{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+  /* Grade simples */
+  .grid{ display:grid; }
+  .items-end{ align-items:end; } .items-center{ align-items:center; } .items-start{ align-items:flex-start; }
+  .justify-between{ justify-content:space-between; }
+  .gap-2{ gap:.5rem; } .gap-3{ gap:.75rem; } .gap-5{ gap:1.25rem; }
+  .grid-cols-1{ grid-template-columns:repeat(1,minmax(0,1fr)); }
+  @media(min-width:640px){ .sm\:grid-cols-2{ grid-template-columns:repeat(2,minmax(0,1fr)); } }
+  @media(min-width:1024px){ .lg\:grid-cols-3{ grid-template-columns:repeat(3,minmax(0,1fr)); } }
+  @media(min-width:1280px){ .xl\:grid-cols-4{ grid-template-columns:repeat(4,minmax(0,1fr)); } }
+
+  /* Aspect ratio helper */
+  .aspect-\[3\/4\]{ aspect-ratio:3/4; }
+  .object-cover{ object-fit:cover; }
+
+  /* Inputs/Select com cara retrô */
+  input, select{
+    width:100%; padding:8px 10px;
+    border-radius:10px;
+    border:3px solid var(--card-border);
+    background:#f5fce4; color:#182718;
+    font-family:"VT323", monospace; font-size:18px;
+    outline:none;
+  }
+  input:focus, select:focus{ box-shadow: 0 0 0 3px color-mix(in srgb, var(--screen-deep) 40%, transparent); }
+
+  /* Botões “pixel“ */
+  .btn{
+    appearance:none; cursor:pointer;
+    background:linear-gradient(180deg, color-mix(in srgb, var(--accent) 90%, #fff 10%), var(--accent));
+    color:#1a1a1a;
+    padding:10px 14px;
+    border-radius:12px;
+    border:3px solid color-mix(in srgb, var(--accent) 60%, #000 40%);
+    font-weight:700; letter-spacing:.3px;
+    box-shadow: 0 2px 0 rgba(0,0,0,.25);
+  }
+  .btn:hover{ filter:brightness(.97); transform: translateY(-1px); }
+  .btn:active{ transform: translateY(0); box-shadow: 0 1px 0 rgba(0,0,0,.2); }
+  .btn:disabled{ opacity:.6; cursor:not-allowed; }
+  .btn-soft{
+    background: linear-gradient(180deg, color-mix(in srgb, var(--screen) 70%, #fff 30%), var(--screen));
+    color:#142214; border-color:#7f9b0b;
+  }
+
+  /* Chip “xN” */
+  .chip{
+    position:absolute; top:10px; left:10px;
+    background:#203820; color:#d9f99d;
+    border:3px solid #132613; border-radius:10px;
+    padding:4px 8px; font-weight:700; font-size:12px;
+  }
+
+  /* Acordeão Mercado & Cotações */
+  .coll-toggle{
+    width:100%; text-align:left;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--screen) 85%, #fff 15%), var(--screen));
+    border:3px solid var(--card-border);
+    border-radius: 12px 12px 0 0;
+    font-weight:700; color:#173117;
+  }
+  .coll-toggle:hover{ filter:brightness(.98); }
+  .coll-toggle .chev{ transition: transform .2s; }
+  .hidden{ display:none; }
+
+  /* Link/realces */
+  .underline{ text-decoration: underline; }
+  .ring{ outline:3px solid; outline-offset: 2px; }
+  .ring-violet-400{ outline-color:#a78bfa; }
+
+  /* Mensagens flash */
+  .flashes{ margin:10px 0 18px; display:grid; gap:10px; }
+  .flash{ padding:10px 12px; border-radius:10px; border:3px solid var(--card-border); background:#f1fad8; }
+  .flash.info{ border-color:#3b82f6; }
+  .flash.success{ border-color:#22c55e; }
+  .flash.warning{ border-color:#f59e0b; }
+  .flash.error{ border-color:#ef4444; }
+
+  /* Toggle de paleta */
+  .theme-toggle{
+    display:flex; gap:6px; align-items:center;
+    background:#e7e1d6; border:2px solid #9b9588; border-radius:10px; padding:4px 6px;
+  }
+  .theme-toggle .label{
+    font-family:"Press Start 2P", monospace; font-size:10px; color:#1a261a; margin-right:4px;
+  }
+  .theme-toggle .opt{
+    background:transparent; border:2px solid transparent; border-radius:8px;
+    font-family:"Press Start 2P", monospace; font-size:10px; padding:4px 8px; cursor:pointer; color:#1a261a;
+  }
+  .theme-toggle .opt:hover{ border-color:#9b9588; }
+  .theme-toggle .opt.active{
+    background: var(--accent); border-color: color-mix(in srgb, var(--accent) 60%, #000 40%); color:#111;
+  }
+
+  /* Rodapé */
+  .footer{
+    text-align:center; color:#1e311e;
+    font-family:"Press Start 2P", monospace; font-size:10px;
+    padding:10px 0 2px;
+  }
+  </style>
+</head>
+<body>
+
+  <div class="topbar">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; max-width:1200px; margin:0 auto;">
+      <a href="{{ url_for('index') }}" class="brand">
+        <span class="mark" aria-hidden="true"></span>
+        <span class="name">EdVenture • Collectr</span>
+      </a>
+
+      <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+        <nav class="nav">
+          <a href="{{ url_for('index') }}" class="{% if request.endpoint == 'index' %}active{% endif %}">Dashboard</a>
+          <a href="{{ url_for('cards') }}" class="{% if request.endpoint == 'cards' %}active{% endif %}">Buscar Cartas</a>
+          <a href="{{ url_for('collection_list') }}" class="{% if request.endpoint == 'collection_list' %}active{% endif %}">Coleção</a>
+          <a href="{{ url_for('wishlist') }}" class="{% if request.endpoint == 'wishlist' %}active{% endif %}">Wishlist</a>
+          <a href="{{ url_for('sets_page') }}" class="{% if request.endpoint == 'sets_page' %}active{% endif %}">Sets</a>
+        </nav>
+
+        <!-- Toggle de paleta -->
+        <div class="theme-toggle" role="group" aria-label="Versões">
+          <span class="label">Version:</span>
+          <button class="opt" data-theme-opt="green" aria-pressed="false">Green</button>
+          <button class="opt" data-theme-opt="red" aria-pressed="false">Red</button>
+          <button class="opt" data-theme-opt="blue" aria-pressed="false">Blue</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <main class="screen">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flashes">
+          {% for category, message in messages %}
+            <div class="flash {{ category }}">{{ message }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+  </main>
+
+  <div class="footer">
+    <div>▶ Feito com ❤ — Tema retrô • BR (R$) • <span id="theme-name">Green</span></div>
+  </div>
+
+  {% block scripts %}{% endblock %}
+  <script>
+    (function(){
+      const STORAGE_KEY = 'collectrTheme';
+      const btns = document.querySelectorAll('[data-theme-opt]');
+      const footerName = document.getElementById('theme-name');
+
+      function applyTheme(theme){
+        document.body.setAttribute('data-theme', theme);
+        localStorage.setItem(STORAGE_KEY, theme);
+        btns.forEach(b=>{
+          const on = b.getAttribute('data-theme-opt') === theme;
+          b.classList.toggle('active', on);
+          b.setAttribute('aria-pressed', on ? 'true':'false');
+        });
+        if(footerName){ footerName.textContent = theme.charAt(0).toUpperCase() + theme.slice(1); }
+      }
+
+      // Inicializa com o salvo (ou green)
+      const saved = localStorage.getItem(STORAGE_KEY) || 'green';
+      applyTheme(saved);
+
+      // Ouve cliques
+      document.addEventListener('click', (ev)=>{
+        const b = ev.target.closest('[data-theme-opt]');
+        if(!b) return;
+        const theme = b.getAttribute('data-theme-opt');
+        applyTheme(theme);
+      });
+    })();
+  </script>
+</body>
+</html>

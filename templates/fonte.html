@@ -1,0 +1,95 @@
+{% extends "layout.html" %}
+{% block content %}
+<section style="max-width: 1100px; margin: 0 auto;">
+  <header style="display:flex; align-items: baseline; gap: 12px; margin-bottom: 12px;">
+    <h2 style="margin: 0;">Fonte: <span style="text-transform: capitalize;">{{ source }}</span></h2>
+    <a href="{{ url_for('fontes_index') }}" style="font-size:.9rem; color:#666; text-decoration:none;">← voltar</a>
+  </header>
+
+  <form method="get" style="display:flex; gap: 8px; margin: 10px 0 22px;">
+    <input
+      type="text"
+      name="q"
+      placeholder="buscar carta (mín. 3 letras)"
+      value="{{ q or '' }}"
+      style="flex:1; padding:10px 12px; border:1px solid #ddd; border-radius:8px;"
+    />
+    <button style="padding:10px 14px; border:1px solid #222; background:#222; color:#fff; border-radius:8px; cursor:pointer;">
+      Buscar
+    </button>
+  </form>
+
+  {% if q and not live and (q|length) >= 3 %}
+    <div style="border:1px dashed #ccc; border-radius:8px; padding:10px 12px; margin-bottom:16px; color:#666;">
+      Nenhum resultado ao vivo para “{{ q }}” nesta fonte.
+    </div>
+  {% endif %}
+
+  {% if live and live|length %}
+    <h3 style="margin: 0 0 8px;">Resultados ao vivo{% if q %} para “{{ q }}”{% endif %}</h3>
+    <div style="overflow:auto; margin-bottom: 22px;">
+      <table style="width:100%; border-collapse: collapse;">
+        <thead>
+          <tr style="text-align:left; border-bottom:1px solid #eee;">
+            <th style="padding:8px 6px; width: 120px;">Preço (R$)</th>
+            <th style="padding:8px 6px;">Título</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in live %}
+            <tr style="border-bottom:1px solid #f2f2f2;">
+              <td style="padding:8px 6px; white-space: nowrap;">{{ '%.2f'|format(r.price_brl) }}</td>
+              <td style="padding:8px 6px;">
+                <a href="{{ r.url }}" target="_blank" rel="noopener" style="text-decoration:none;">
+                  {{ r.title }}
+                </a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+
+  <h3 style="margin: 18px 0 8px;">Snapshot mais recente</h3>
+  {% if snapshot and snapshot|length %}
+    <div style="overflow:auto;">
+      <table style="width:100%; border-collapse: collapse;">
+        <thead>
+          <tr style="text-align:left; border-bottom:1px solid #eee;">
+            <th style="padding:8px 6px; min-width: 160px;">Query</th>
+            <th style="padding:8px 6px; width: 120px;">Min (R$)</th>
+            <th style="padding:8px 6px; width: 120px;">Máx (R$)</th>
+            <th style="padding:8px 6px; width: 120px;">Médio (R$)</th>
+            <th style="padding:8px 6px;">Título</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in snapshot %}
+            {% set mid = (p.price_min_brl + p.price_max_brl) / 2 %}
+            <tr style="border-bottom:1px solid #f2f2f2;">
+              <td style="padding:8px 6px;">
+                <a href="{{ url_for('card_view', query=p.query) }}" style="text-decoration:none;">
+                  {{ p.query }}
+                </a>
+              </td>
+              <td style="padding:8px 6px; white-space: nowrap;">{{ '%.2f'|format(p.price_min_brl) }}</td>
+              <td style="padding:8px 6px; white-space: nowrap;">{{ '%.2f'|format(p.price_max_brl) }}</td>
+              <td style="padding:8px 6px; white-space: nowrap;">{{ '%.2f'|format(mid) }}</td>
+              <td style="padding:8px 6px;">
+                <a href="{{ p.url }}" target="_blank" rel="noopener" style="text-decoration:none;">
+                  {{ p.title }}
+                </a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div style="border:1px dashed #ccc; border-radius:8px; padding:10px 12px; color:#666;">
+      Ainda não há snapshot para esta fonte.
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

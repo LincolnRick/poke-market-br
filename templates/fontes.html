@@ -1,0 +1,187 @@
+{% extends "layout.html" %}
+{% block title %}Buscar cartas • Collectr{% endblock %}
+
+{% block content %}
+<section class="max-w-[1100px] mx-auto">
+  <header class="mb-4">
+    <h1 class="text-2xl font-semibold">Buscar cartas</h1>
+    <p class="text-slate-500 text-sm mt-1">
+      Para agilizar, use <b>Adicionar por número</b> (ex.: <code>65/82</code>). Se a carta não existir no catálogo local, tentaremos <b>importar automaticamente</b> antes de adicionar.
+    </p>
+  </header>
+
+  <!-- ALERTAS (flash) -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="space-y-2 mb-4">
+        {% for category, message in messages %}
+          <div class="rounded-lg px-3 py-2 {% if category == 'error' %}bg-red-50 text-red-700 border border-red-200{% elif category == 'warning' %}bg-amber-50 text-amber-800 border border-amber-200{% elif category == 'success' %}bg-emerald-50 text-emerald-800 border border-emerald-200{% else %}bg-slate-50 text-slate-700 border border-slate-200{% endif %}">
+            {{ message }}
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <!-- ADICIONAR POR NÚMERO (X/Y) -->
+  <div class="card p-3 mb-4">
+    <h2 class="font-semibold mb-2">Adicionar por número (X/Y)</h2>
+    <form method="post" action="{{ url_for('collection_add') }}" class="grid grid-cols-1 md:grid-cols-6 gap-3 items-end">
+      <div class="md:col-span-2">
+        <label class="text-xs text-slate-600">Número impresso</label>
+        <input type="text" name="number" placeholder="ex.: 65/82" required>
+      </div>
+      <div class="md:col-span-2">
+        <label class="text-xs text-slate-600">Set (opcional)</label>
+        <input type="text" name="set_code" placeholder="ex.: sm9, base1, sv6">
+      </div>
+      <div>
+        <label class="text-xs text-slate-600">Qtd</label>
+        <input type="number" name="quantity" min="1" value="1">
+      </div>
+      <div>
+        <label class="text-xs text-slate-600">Cond</label>
+        <select name="condition">
+          {% set conds = ["NM","LP","MP","HP","DMG"] %}
+          {% for opt in conds %}
+            <option value="{{ opt }}">{{ opt }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="md:col-span-6">
+        <button class="btn">Adicionar</button>
+      </div>
+    </form>
+    <p class="text-[12px] text-slate-500 mt-2">
+      Dica: se houver múltiplas cartas com o mesmo número em sets diferentes, informe o <b>Set</b> (código oficial da API, ex.: <code>sm9</code> para Team Up).
+    </p>
+  </div>
+
+  <!-- BUSCAR POR NOME -->
+  <form method="get" action="{{ url_for('cards') }}" class="card p-3 mb-4">
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+      <div class="md:col-span-2">
+        <label class="text-xs text-slate-600">Buscar por nome</label>
+        <input
+          type="text"
+          name="q"
+          value="{{ q or '' }}"
+          placeholder="Ex.: Psyduck, Charizard..."
+          class="w-full"
+          autocomplete="off"
+        >
+      </div>
+
+      <div>
+        <label class="text-xs text-slate-600">Set</label>
+        <select name="set_id" class="w-full">
+          <option value="">Todos</option>
+          {% for s in sets %}
+            <option value="{{ s.id }}" {% if set_id|int(default=0) == s.id %}selected{% endif %}>{{ s.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label class="text-xs text-slate-600">Raridade</label>
+        <select name="rarity" class="w-full">
+          <option value="">Todas</option>
+          {% for r in rarities %}
+            <option value="{{ r }}" {% if (rarity or '') == r %}selected{% endif %}>{{ r }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="md:col-span-2 flex items-end gap-3">
+        <label class="inline-flex items-center gap-2">
+          <input type="checkbox" name="only_missing" {% if only_missing %}checked{% endif %}>
+          <span class="text-sm">Apenas não possuídas</span>
+        </label>
+        <button class="btn">Buscar</button>
+        <a href="{{ url_for('cards') }}" class="btn btn-soft">Limpar</a>
+      </div>
+    </div>
+  </form>
+
+  <!-- RESULTADOS -->
+  {% if results and results|length > 0 %}
+    <div class="flex items-center justify-between mb-2">
+      <div class="text-sm text-slate-500">
+        {{ results|length }} resultado{{ 's' if results|length != 1 else '' }}
+        {% if q %} para <b>"{{ q }}"</b>{% endif %}
+        {% if set_id %} • Set filtrado{% endif %}
+        {% if rarity %} • Raridade: {{ rarity }}{% endif %}
+        {% if only_missing %} • Apenas não possuídas{% endif %}
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+      {% for c in results %}
+        <article class="card p-3">
+          <div class="relative">
+            {% if c.image_url %}
+              <img src="{{ c.image_url }}" alt="Imagem de {{ c.name }}" class="w-full aspect-[3/4] object-cover rounded-xl">
+            {% else %}
+              <div class="w-full aspect-[3/4] rounded-xl" style="background:#dfecc4; display:grid; place-items:center; color:#2c452c;">sem imagem</div>
+            {% endif %}
+          </div>
+
+          <div class="mt-3">
+            <h3 class="font-semibold leading-tight truncate" title="{{ c.name }}">{{ c.name }}</h3>
+            <p class="text-xs text-slate-500 truncate">
+              {% if c.set %}<a href="{{ url_for('set_view', set_id=c.set.id) }}" class="underline hover:no-underline">{{ c.set.name }}</a>{% else %}—{% endif %} • #{{ c.number or '—' }}{% if c.rarity %} • {{ c.rarity }}{% endif %}
+            </p>
+          </div>
+
+          <form action="{{ url_for('collection_add') }}" method="post" class="mt-3 grid grid-cols-6 gap-2 items-end">
+            <input type="hidden" name="card_id" value="{{ c.id }}">
+            <div class="col-span-2">
+              <label class="text-xs text-slate-600">Qtd</label>
+              <input type="number" name="quantity" min="1" value="1">
+            </div>
+            <div class="col-span-2">
+              <label class="text-xs text-slate-600">Cond</label>
+              <select name="condition">
+                {% set conds = ["NM","LP","MP","HP","DMG"] %}
+                {% for opt in conds %}
+                  <option value="{{ opt }}">{{ opt }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-span-2">
+              <button class="btn w-full">Adicionar</button>
+            </div>
+          </form>
+
+          <!-- wishlist quick-add -->
+          <form action="{{ url_for('wishlist_add') }}" method="post" class="mt-2 grid grid-cols-6 gap-2 items-end">
+            <input type="hidden" name="card_id" value="{{ c.id }}">
+            <div class="col-span-4">
+              <label class="text-xs text-slate-600">Preço-alvo (opcional)</label>
+              <input type="number" name="target_price" min="0" step="0.01" placeholder="ex.: 49.90">
+            </div>
+            <div class="col-span-2">
+              <button class="btn w-full btn-outline">Wishlist</button>
+            </div>
+          </form>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="card p-6">
+      <p class="text-slate-600">
+        Nenhuma carta listada aqui ainda.
+        {% if q %}
+          <br>Se você buscou por <b>nome</b>, tente outras variações (ex.: sem acentos).
+        {% else %}
+          <br>Use <b>Adicionar por número</b> acima para inserir cartas rapidamente (ex.: <code>65/82</code>).
+        {% endif %}
+      </p>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block scripts %}
+<!-- Nenhum JS especial: formulários postam normalmente -->
+{% endblock %}
