@@ -30,7 +30,7 @@ from flask import (
     abort,
     Response,
 )
-from sqlalchemy import func, distinct
+from sqlalchemy import func, distinct, or_
 
 from config import Config
 from db import (
@@ -274,7 +274,10 @@ def create_app() -> Flask:
                 # Busca tolerante por nome (AND entre tokens simples)
                 raw_tokens, _ = _tokenize(q)
                 for t in raw_tokens:
-                    query = query.filter(Card.name.ilike(f"%{t}%"))
+                    query = query.filter(or_(
+                        Card.name.ilike(f"%{t}%"),
+                        Card.name_pt.ilike(f"%{t}%"),
+                    ))
 
         # Filtro por set
         if set_id:
@@ -347,7 +350,10 @@ def create_app() -> Flask:
                     query = Card.query
                     raw_tokens, _ = _tokenize(q)
                     for t in raw_tokens:
-                        query = query.filter(Card.name.ilike(f"%{t}%"))
+                        query = query.filter(or_(
+                            Card.name.ilike(f"%{t}%"),
+                            Card.name_pt.ilike(f"%{t}%"),
+                        ))
                     if set_id:
                         try:
                             query = query.filter(Card.set_id == int(set_id))
@@ -786,7 +792,10 @@ def create_app() -> Flask:
                 number = _normalize_print_number(q)
                 query = query.filter(Card.number == (number.split("/")[0] if "/" in number else number))
             else:
-                query = query.filter(Card.name.ilike(f"%{q}%"))
+                query = query.filter(or_(
+                    Card.name.ilike(f"%{q}%"),
+                    Card.name_pt.ilike(f"%{q}%"),
+                ))
         cards = query.order_by(Card.name.asc()).limit(50).all()
         if (not cards) and q:
             if _NUMBER_RE.match(q):
@@ -801,7 +810,10 @@ def create_app() -> Flask:
                     query = Card.query
                     raw, _ = _tokenize(q)
                     for t in raw:
-                        query = query.filter(Card.name.ilike(f"%{t}%"))
+                        query = query.filter(or_(
+                            Card.name.ilike(f"%{t}%"),
+                            Card.name_pt.ilike(f"%{t}%"),
+                        ))
                     cards = query.order_by(Card.name.asc()).limit(50).all()
         
         return jsonify([c.as_dict() for c in cards])

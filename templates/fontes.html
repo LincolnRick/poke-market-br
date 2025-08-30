@@ -118,16 +118,18 @@
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
       {% for c in results %}
         <article class="card p-3">
+          {% set display_name = c.name_pt or c.name %}
+          {% set img_url = c.image_url_pt or c.image_url %}
           <div class="relative">
-            {% if c.image_url %}
-              <img src="{{ c.image_url }}" alt="Imagem de {{ c.name }}" class="w-full aspect-[3/4] object-cover rounded-xl">
+            {% if img_url %}
+              <img src="{{ img_url }}" alt="Imagem de {{ display_name }}" class="w-full aspect-[3/4] object-cover rounded-xl">
             {% else %}
               <div class="w-full aspect-[3/4] rounded-xl" style="background:#dfecc4; display:grid; place-items:center; color:#2c452c;">sem imagem</div>
             {% endif %}
           </div>
 
           <div class="mt-3">
-            <h3 class="font-semibold leading-tight truncate" title="{{ c.name }}">{{ c.name }}</h3>
+            <h3 class="font-semibold leading-tight truncate" title="{{ display_name }}">{{ display_name }}</h3>
             <p class="text-xs text-slate-500 truncate">
               {% if c.set %}<a href="{{ url_for('set_view', set_id=c.set.id) }}" class="underline hover:no-underline">{{ c.set.name }}</a>{% else %}—{% endif %} • #{{ c.number or '—' }}{% if c.rarity %} • {{ c.rarity }}{% endif %}
             </p>
