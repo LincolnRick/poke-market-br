@@ -52,6 +52,7 @@ from pokemontcg_import import (
     import_set,
     ensure_single_by_number,
 )
+from services.pricing import scrape_and_price
 
 _NUMBER_RE = re.compile(r'^\s*\d+(?:\s*/\s*\d+)?\s*$')
 
@@ -819,6 +820,13 @@ def create_app() -> Flask:
             .all()
         )
         return jsonify([h.as_dict() for h in hist])
+
+    @app.get("/api/price_search")
+    def api_price_search():
+        q = (request.args.get("q") or "").strip()
+        if not q:
+            abort(400, "parâmetro q obrigatório")
+        return jsonify(scrape_and_price(q))
 
     @app.post("/price/record")
     def price_record():
