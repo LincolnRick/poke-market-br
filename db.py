@@ -90,6 +90,8 @@ class Card(db.Model):
     rarity: Mapped[Optional[str]] = mapped_column(db.String(50))
     type: Mapped[Optional[str]] = mapped_column(db.String(50))
     image_url: Mapped[Optional[str]] = mapped_column(db.String(500))
+    name_pt: Mapped[Optional[str]] = mapped_column(db.String(200), index=True)
+    image_url_pt: Mapped[Optional[str]] = mapped_column(db.String(500))
 
     set_id: Mapped[int] = mapped_column(
         ForeignKey("sets.id", ondelete="CASCADE"), nullable=False, index=True
@@ -124,10 +126,12 @@ class Card(db.Model):
         return {
             "id": self.id,
             "name": self.name,
+            "name_pt": self.name_pt,
             "number": self.number,
             "rarity": self.rarity,
             "type": self.type,
             "image_url": self.image_url,
+            "image_url_pt": self.image_url_pt,
             "set": self.set.as_dict() if self.set else None,
             "latest_price": self.latest_price(),
         }
