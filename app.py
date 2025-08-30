@@ -53,6 +53,7 @@ from pokemontcg_import import (
     ensure_single_by_number,
 )
 from services.pricing import scrape_and_price
+from services.search import search_cards
 
 _NUMBER_RE = re.compile(r'^\s*\d+(?:\s*/\s*\d+)?\s*$')
 
@@ -184,6 +185,8 @@ def create_app() -> Flask:
         if db_file:
             os.makedirs(os.path.dirname(db_file), exist_ok=True)
         db.create_all()
+        from services.search import ensure_card_tokens
+        ensure_card_tokens()
 
     # -------------------------------------------------------------------------
     # Debug do banco
@@ -258,40 +261,7 @@ def create_app() -> Flask:
         set_id = (request.args.get("set_id") or "").strip()
         rarity = (request.args.get("rarity") or "").strip()
         only_missing = (request.args.get("only_missing") == "on")
-
-        # Base da consulta local
-        query = Card.query
-
-        # Filtro de texto / número
-        if q:
-            if _NUMBER_RE.match(q):
-                # Normaliza "X / Y" -> "X/Y" e compara pelo numerador X
-                number = _normalize_print_number(q)
-                query = query.filter(
-                    Card.number == (number.split("/")[0] if "/" in number else number)
-                )
-            else:
-                # Busca tolerante por nome (AND entre tokens simples)
-                raw_tokens, _ = _tokenize(q)
-                for t in raw_tokens:
-                    query = query.filter(or_(
-                        Card.name.ilike(f"%{t}%"),
-                        Card.name_pt.ilike(f"%{t}%"),
-                    ))
-
-        # Filtro por set
-        if set_id:
-            try:
-                query = query.filter(Card.set_id == int(set_id))
-            except ValueError:
-                pass
-
-        # Filtro por raridade
-        if rarity:
-            query = query.filter(Card.rarity == rarity)
-
-        # Primeiro tenta só no banco local
-        results = query.order_by(Card.name.asc()).limit(200).all()
+        results = search_cards(q, set_id=set_id, rarity=rarity)
 
         # -------------------------
         # Auto-import quando vazio
@@ -313,18 +283,7 @@ def create_app() -> Flask:
                 imported = import_by_print_number(number, set_code=chosen_set_code)
                 if imported:
                     flash(f"Importadas {len(imported)} carta(s) pelo número {number}.", "info")
-                    # Reexecuta a busca local com os mesmos filtros
-                    query = Card.query.filter(
-                        Card.number == (number.split("/")[0] if "/" in number else number)
-                    )
-                    if set_id:
-                        try:
-                            query = query.filter(Card.set_id == int(set_id))
-                        except ValueError:
-                            pass
-                    if rarity:
-                        query = query.filter(Card.rarity == rarity)
-                    results = query.order_by(Card.name.asc()).limit(200).all()
+                    results = search_cards(q, set_id=set_id, rarity=rarity)
                 else:
                     flash(f"Nenhuma carta oficial encontrada para o número {number}.", "warning")
 
@@ -346,22 +305,7 @@ def create_app() -> Flask:
                 imported = import_by_name(q, set_code=chosen_set_code, limit=60)
                 if imported:
                     flash(f"Importadas {len(imported)} carta(s) pelo nome '{q}'.", "info")
-                    # Reexecuta a busca local com tokenização (AND)
-                    query = Card.query
-                    raw_tokens, _ = _tokenize(q)
-                    for t in raw_tokens:
-                        query = query.filter(or_(
-                            Card.name.ilike(f"%{t}%"),
-                            Card.name_pt.ilike(f"%{t}%"),
-                        ))
-                    if set_id:
-                        try:
-                            query = query.filter(Card.set_id == int(set_id))
-                        except ValueError:
-                            pass
-                    if rarity:
-                        query = query.filter(Card.rarity == rarity)
-                    results = query.order_by(Card.name.asc()).limit(200).all()
+                    results = search_cards(q, set_id=set_id, rarity=rarity)
                 else:
                     flash(f"Nenhuma carta oficial encontrada pelo nome '{q}'.", "warning")
 

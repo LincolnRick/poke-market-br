@@ -27,6 +27,7 @@ except Exception:
 from db import db, Set, Card
 from scrapers.ligapokemon_html import LigaPokemonHTMLScraper
 from liga_market import _build_queries as _br_queries
+from services.search import update_card_search_tokens
 
 API_BASE = "https://api.pokemontcg.io/v2"
 CARDS_EP = f"{API_BASE}/cards"
@@ -173,6 +174,7 @@ def upsert_card(api_card: Dict, s: Set) -> Card:
     except Exception:
         pass
     db.session.flush()
+    update_card_search_tokens(c)
     return c
 
 # ========= Buscar set por código =========

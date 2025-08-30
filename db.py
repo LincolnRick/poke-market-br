@@ -107,6 +107,9 @@ class Card(db.Model):
     price_history: Mapped[List["PriceHistory"]] = relationship(
         "PriceHistory", back_populates="card", lazy=True, cascade="all, delete-orphan"
     )
+    search_tokens: Mapped[List["CardSearchToken"]] = relationship(
+        "CardSearchToken", back_populates="card", lazy=True, cascade="all, delete-orphan"
+    )
 
     def latest_price(self) -> Optional[float]:
         """
@@ -138,6 +141,24 @@ class Card(db.Model):
 
     def __repr__(self) -> str:
         return f"<Card id={self.id} name={self.name!r} number={self.number!r} set_id={self.set_id}>"
+
+
+class CardSearchToken(db.Model):
+    """Tokens normalizados para busca rápida de cartas."""
+    __tablename__ = "card_search_tokens"
+    __table_args__ = (
+        UniqueConstraint("card_id", "token", name="uq_cardtoken"),
+        Index("ix_cardtoken_token", "token"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    card_id: Mapped[int] = mapped_column(
+        ForeignKey("cards.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    token: Mapped[str] = mapped_column(db.String(50), nullable=False)
+
+    # Relacionamentos
+    card: Mapped[Card] = relationship("Card", back_populates="search_tokens")
 
 
 class CollectionItem(db.Model):
