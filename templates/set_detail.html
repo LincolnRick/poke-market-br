@@ -58,9 +58,11 @@
           <span class="text-sm text-slate-600">Selecionar</span>
         </label>
 
+        {% set display_name = c.name_pt or c.name %}
+        {% set img_url = c.image_url_pt or c.image_url %}
         <div class="relative mt-2">
-          {% if c.image_url %}
-            <img src="{{ c.image_url }}" alt="Imagem de {{ c.name }}" class="w-full aspect-[3/4] object-cover rounded-xl">
+          {% if img_url %}
+            <img src="{{ img_url }}" alt="Imagem de {{ display_name }}" class="w-full aspect-[3/4] object-cover rounded-xl">
           {% else %}
             <div class="w-full aspect-[3/4] rounded-xl" style="border:1px dashed #d9e6d9; background:linear-gradient(120deg,#f8fcf8,#f1f6f1); display:grid; place-items:center; color:#2c452c;">sem imagem</div>
           {% endif %}
@@ -75,7 +77,7 @@
         </div>
 
         <div class="mt-3">
-          <h3 class="font-semibold leading-tight truncate" title="{{ c.name }}">{{ c.name }}</h3>
+          <h3 class="font-semibold leading-tight truncate" title="{{ display_name }}">{{ display_name }}</h3>
           <p class="text-xs text-slate-500 truncate">#{{ c.number or '—' }}{% if c.rarity %} • {{ c.rarity }}{% endif %}</p>
         </div>
       </article>
