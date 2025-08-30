@@ -6,7 +6,7 @@
   <header class="mb-4">
     <h1 id="collection-title" class="text-2xl font-semibold">Sua coleção</h1>
     <p class="text-slate-500 text-sm mt-1">
-      Precificação automática desativada por enquanto. Informe o <b>Preço (R$)</b> manualmente ao editar cada item.
+      Preços estimados buscados automaticamente dos scrapers. Ajuste manualmente em <b>Preço (R$)</b> se desejar.
     </p>
   </header>
 
@@ -14,7 +14,8 @@
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
       {% for it in items %}
         {% set c = it.card %}
-        <article class="card p-3" data-card-id="{{ c.id }}" data-item-id="{{ it.id }}">
+        {% set query = (c.name ~ ' ' ~ (c.set.name if c.set else '') ~ ' ' ~ (c.number or '')) %}
+        <article class="card p-3" data-card-id="{{ c.id }}" data-item-id="{{ it.id }}" data-query="{{ query|trim }}">
           <!-- Imagem -->
           <div class="relative">
             {% if c and c.image_url %}
@@ -33,13 +34,16 @@
             </p>
           </div>
 
-          <!-- Estimado (com base no valor unitário atual) -->
-          <div class="mt-2 text-sm flex items-center justify-between">
-            <span class="text-slate-500"
-                  title="Cálculo do estimado (unid): usa 'Preço (R$)' do item; se vazio, usa o último histórico da carta; se ainda não houver, cai para 'Pago (R$)'.">
-              Estimado (unid):
-            </span>
-            <b>R$ {{ '%.2f'|format(it.unit_estimated_value) }}</b>
+          <!-- Estimado (buscado dinamicamente) -->
+          <div class="mt-2 text-sm" data-pricing>
+            <div class="flex items-center justify-between">
+              <span class="text-slate-500"
+                    title="Cálculo do estimado (unid): usa dados obtidos via scrapers; ajuste manual se necessário.">
+                Estimado (unid):
+              </span>
+              <b class="est-unit">R$ {{ '%.2f'|format(it.unit_estimated_value) }}</b>
+            </div>
+            <ul class="price-results text-xs text-slate-600 mt-1 space-y-0.5"></ul>
           </div>
 
           <!-- Form edição (somente manual) -->
@@ -101,5 +105,40 @@
 {% endblock %}
 
 {% block scripts %}
-<!-- Nenhum JS necessário aqui, já que a precificação automática está desativada -->
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('article.card[data-query]').forEach(card => {
+    const query = card.getAttribute('data-query');
+    const valueEl = card.querySelector('.est-unit');
+    const listEl = card.querySelector('.price-results');
+    if(!query) return;
+    fetch(`/api/price_search?q=${encodeURIComponent(query)}`)
+      .then(r => r.json())
+      .then(data => {
+        if(data.stats && valueEl){
+          const v = Number(data.stats.median || 0).toFixed(2);
+          valueEl.textContent = `R$ ${v}`;
+        }
+        if(Array.isArray(data.results) && listEl){
+          listEl.innerHTML = '';
+          if(data.results.length === 0){
+            listEl.innerHTML = '<li>Nenhum preço encontrado</li>';
+            return;
+          }
+          data.results.forEach(r => {
+            const li = document.createElement('li');
+            const min = Number(r.price_min_brl).toFixed(2);
+            const max = Number(r.price_max_brl).toFixed(2);
+            const range = (min === max) ? min : `${min}–${max}`;
+            li.innerHTML = `<a href="${r.url}" target="_blank" rel="noopener">${r.source}: R$ ${range}</a>`;
+            listEl.appendChild(li);
+          });
+        }
+      })
+      .catch(() => {
+        if(listEl) listEl.innerHTML = '<li>Erro ao obter preços</li>';
+      });
+  });
+});
+</script>
 {% endblock %}
