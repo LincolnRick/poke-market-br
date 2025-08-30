@@ -129,6 +129,19 @@ def _closest_tile_text(a_tag) -> str:
     return _clean(a_tag.get_text(" ", strip=True))
 
 
+def _closest_image_url(a_tag) -> Optional[str]:
+    """Tenta encontrar o <img> relacionado ao tile do link."""
+    node = a_tag
+    for _ in range(6):
+        if node is None:
+            break
+        img = node.find("img")
+        if img and img.get("src"):
+            return urljoin(BASE_URL, img.get("src"))
+        node = node.parent
+    return None
+
+
 def _detail_price(url: str, timeout: int = 15) -> Tuple[Optional[float], Optional[str]]:
     """
     Abre a página de detalhe e tenta extrair o preço visível.
@@ -197,6 +210,7 @@ class LigaPokemonHTMLScraper(BaseScraper):
                     title = _clean(a.get_text(" ").strip())
                     if not title:
                         title = block_text
+                    img_url = _closest_image_url(a)
 
                     # Preço no tile
                     price = _to_brl_float(block_text)
@@ -224,6 +238,7 @@ class LigaPokemonHTMLScraper(BaseScraper):
                         url=abs_url,
                         price_min_brl=price,
                         price_max_brl=price,
+                        image_url=img_url,
                     ).clamp()
 
                     results.append(pr)
