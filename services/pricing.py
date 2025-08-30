@@ -11,6 +11,8 @@ from __future__ import annotations
 from statistics import mean, median
 from typing import Dict, List, Sequence, Type
 
+__all__ = ["scrape_all", "compute_stats", "scrape_and_price"]
+
 from scrapers.base import BaseScraper, PriceResult
 from scrapers.mercadolivre import MercadoLivreScraper
 from scrapers.cardmarket import CardMarketScraper
@@ -85,9 +87,12 @@ def compute_stats(results: Sequence[PriceResult]) -> Dict[str, float]:
     if not results:
         return {"min": 0.0, "max": 0.0, "avg": 0.0, "median": 0.0}
 
-    mids = [(r.price_min_brl + r.price_max_brl) / 2 for r in results]
-    min_v = min(r.price_min_brl for r in results)
-    max_v = max(r.price_max_brl for r in results)
+    # Clamp values defensively so mis-parsed scrapers do not skew statistics.
+    clamped = [r.clamp() for r in results]
+
+    mids = [(r.price_min_brl + r.price_max_brl) / 2 for r in clamped]
+    min_v = min(r.price_min_brl for r in clamped)
+    max_v = max(r.price_max_brl for r in clamped)
     return {
         "min": round(min_v, 2),
         "max": round(max_v, 2),
