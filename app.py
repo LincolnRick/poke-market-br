@@ -45,10 +45,8 @@ from db import (
     kpi_wishlist_count,
     kpi_total_estimated_value,
 )
-from pokemontcg_import import (
+from tcgdex_import import (
     import_by_print_number,
-    import_by_name,
-    import_hybrid,
     import_set,
     ensure_single_by_number,
 )
@@ -288,26 +286,7 @@ def create_app() -> Flask:
                     flash(f"Nenhuma carta oficial encontrada para o número {number}.", "warning")
 
             else:
-                # Importa por nome (com suporte a "set_code" embutido no texto, ex.: "Psyduck sm9")
-                _number, set_code_hint, _parts = _parse_search_query(q)
-
-                # Se o usuário escolheu set no seletor, isso tem prioridade sobre o hint do texto
-                chosen_set_code = None
-                if set_id:
-                    try:
-                        s = db.session.get(Set, int(set_id))
-                        chosen_set_code = getattr(s, "code", None)
-                    except Exception:
-                        pass
-                if not chosen_set_code:
-                    chosen_set_code = set_code_hint
-
-                imported = import_by_name(q, set_code=chosen_set_code, limit=60)
-                if imported:
-                    flash(f"Importadas {len(imported)} carta(s) pelo nome '{q}'.", "info")
-                    results = search_cards(q, set_id=set_id, rarity=rarity)
-                else:
-                    flash(f"Nenhuma carta oficial encontrada pelo nome '{q}'.", "warning")
+                flash("Importação automática por nome desativada no momento.", "info")
 
         # Apenas não possuídas (aplica no final, para funcionar tanto com local quanto após import)
         if only_missing and results:
@@ -747,18 +726,8 @@ def create_app() -> Flask:
                 query = Card.query.filter(Card.number == (number.split("/")[0] if "/" in number else number))
                 cards = query.order_by(Card.name.asc()).limit(50).all()
             else:
-                # tenta importar por nome quando não há resultados
-                _, set_code, _ = _parse_search_query(q)
-                imported = import_by_name(q, set_code=set_code, limit=30)
-                if imported:
-                    query = Card.query
-                    raw, _ = _tokenize(q)
-                    for t in raw:
-                        query = query.filter(or_(
-                            Card.name.ilike(f"%{t}%"),
-                            Card.name_pt.ilike(f"%{t}%"),
-                        ))
-                    cards = query.order_by(Card.name.asc()).limit(50).all()
+                # Importação automática por nome desativada
+                pass
         
         return jsonify([c.as_dict() for c in cards])
 
