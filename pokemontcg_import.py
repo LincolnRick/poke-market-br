@@ -25,9 +25,6 @@ except Exception:
     Retry = None  # type: ignore
 
 from db import db, Set, Card
-from scrapers.ligapokemon_html import LigaPokemonHTMLScraper
-from liga_market import _build_queries as _br_queries
-from services.search import update_card_search_tokens
 
 API_BASE = "https://api.pokemontcg.io/v2"
 CARDS_EP = f"{API_BASE}/cards"
@@ -38,7 +35,6 @@ PAGE_SIZE = 50     # evita payloads gigantes
 
 # ========= Sessão HTTP com retries =========
 _SESSION: Optional[requests.Session] = None
-_PT_SCRAPER = LigaPokemonHTMLScraper()
 
 def _session() -> requests.Session:
     global _SESSION
@@ -131,24 +127,6 @@ def upsert_set(api_set: Dict) -> Set:
     db.session.flush()
     return s
 
-def _enrich_portuguese(card: Card) -> None:
-    """Preenche nome e imagem em PT-BR usando Liga Pokémon."""
-    if card.name_pt and card.image_url_pt:
-        return
-    queries = _br_queries(card)
-    for q in queries:
-        try:
-            results = _PT_SCRAPER.search(q)
-        except Exception:
-            continue
-        if not results:
-            continue
-        best = results[0]
-        card.name_pt = best.title[:200]
-        if best.image_url:
-            card.image_url_pt = best.image_url[:500]
-        break
-
 def upsert_card(api_card: Dict, s: Set) -> Card:
     """Cria/atualiza um Card local no Set informado."""
     name = api_card.get("name") or "?"
@@ -169,12 +147,7 @@ def upsert_card(api_card: Dict, s: Set) -> Card:
         c.rarity = rarity
         c.type = ctype
         c.image_url = image_url
-    try:
-        _enrich_portuguese(c)
-    except Exception:
-        pass
     db.session.flush()
-    update_card_search_tokens(c)
     return c
 
 # ========= Buscar set por código =========

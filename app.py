@@ -30,7 +30,7 @@ from flask import (
     abort,
     Response,
 )
-from sqlalchemy import func, distinct, or_
+from sqlalchemy import func, distinct
 
 from config import Config
 from db import (
@@ -45,13 +45,13 @@ from db import (
     kpi_wishlist_count,
     kpi_total_estimated_value,
 )
-from tcgdex_import import (
+from pokemontcg_import import (
     import_by_print_number,
+    import_by_name,
+    import_hybrid,
     import_set,
     ensure_single_by_number,
 )
-from services.pricing import scrape_and_price
-from services.search import search_cards
 
 _NUMBER_RE = re.compile(r'^\s*\d+(?:\s*/\s*\d+)?\s*$')
 
@@ -183,8 +183,6 @@ def create_app() -> Flask:
         if db_file:
             os.makedirs(os.path.dirname(db_file), exist_ok=True)
         db.create_all()
-        from services.search import ensure_card_tokens
-        ensure_card_tokens()
 
     # -------------------------------------------------------------------------
     # Debug do banco
@@ -259,7 +257,37 @@ def create_app() -> Flask:
         set_id = (request.args.get("set_id") or "").strip()
         rarity = (request.args.get("rarity") or "").strip()
         only_missing = (request.args.get("only_missing") == "on")
-        results = search_cards(q, set_id=set_id, rarity=rarity)
+
+        # Base da consulta local
+        query = Card.query
+
+        # Filtro de texto / número
+        if q:
+            if _NUMBER_RE.match(q):
+                # Normaliza "X / Y" -> "X/Y" e compara pelo numerador X
+                number = _normalize_print_number(q)
+                query = query.filter(
+                    Card.number == (number.split("/")[0] if "/" in number else number)
+                )
+            else:
+                # Busca tolerante por nome (AND entre tokens simples)
+                raw_tokens, _ = _tokenize(q)
+                for t in raw_tokens:
+                    query = query.filter(Card.name.ilike(f"%{t}%"))
+
+        # Filtro por set
+        if set_id:
+            try:
+                query = query.filter(Card.set_id == int(set_id))
+            except ValueError:
+                pass
+
+        # Filtro por raridade
+        if rarity:
+            query = query.filter(Card.rarity == rarity)
+
+        # Primeiro tenta só no banco local
+        results = query.order_by(Card.name.asc()).limit(200).all()
 
         # -------------------------
         # Auto-import quando vazio
@@ -281,12 +309,54 @@ def create_app() -> Flask:
                 imported = import_by_print_number(number, set_code=chosen_set_code)
                 if imported:
                     flash(f"Importadas {len(imported)} carta(s) pelo número {number}.", "info")
-                    results = search_cards(q, set_id=set_id, rarity=rarity)
+                    # Reexecuta a busca local com os mesmos filtros
+                    query = Card.query.filter(
+                        Card.number == (number.split("/")[0] if "/" in number else number)
+                    )
+                    if set_id:
+                        try:
+                            query = query.filter(Card.set_id == int(set_id))
+                        except ValueError:
+                            pass
+                    if rarity:
+                        query = query.filter(Card.rarity == rarity)
+                    results = query.order_by(Card.name.asc()).limit(200).all()
                 else:
                     flash(f"Nenhuma carta oficial encontrada para o número {number}.", "warning")
 
             else:
-                flash("Importação automática por nome desativada no momento.", "info")
+                # Importa por nome (com suporte a "set_code" embutido no texto, ex.: "Psyduck sm9")
+                _number, set_code_hint, _parts = _parse_search_query(q)
+
+                # Se o usuário escolheu set no seletor, isso tem prioridade sobre o hint do texto
+                chosen_set_code = None
+                if set_id:
+                    try:
+                        s = db.session.get(Set, int(set_id))
+                        chosen_set_code = getattr(s, "code", None)
+                    except Exception:
+                        pass
+                if not chosen_set_code:
+                    chosen_set_code = set_code_hint
+
+                imported = import_by_name(q, set_code=chosen_set_code, limit=60)
+                if imported:
+                    flash(f"Importadas {len(imported)} carta(s) pelo nome '{q}'.", "info")
+                    # Reexecuta a busca local com tokenização (AND)
+                    query = Card.query
+                    raw_tokens, _ = _tokenize(q)
+                    for t in raw_tokens:
+                        query = query.filter(Card.name.ilike(f"%{t}%"))
+                    if set_id:
+                        try:
+                            query = query.filter(Card.set_id == int(set_id))
+                        except ValueError:
+                            pass
+                    if rarity:
+                        query = query.filter(Card.rarity == rarity)
+                    results = query.order_by(Card.name.asc()).limit(200).all()
+                else:
+                    flash(f"Nenhuma carta oficial encontrada pelo nome '{q}'.", "warning")
 
         # Apenas não possuídas (aplica no final, para funcionar tanto com local quanto após import)
         if only_missing and results:
@@ -715,10 +785,7 @@ def create_app() -> Flask:
                 number = _normalize_print_number(q)
                 query = query.filter(Card.number == (number.split("/")[0] if "/" in number else number))
             else:
-                query = query.filter(or_(
-                    Card.name.ilike(f"%{q}%"),
-                    Card.name_pt.ilike(f"%{q}%"),
-                ))
+                query = query.filter(Card.name.ilike(f"%{q}%"))
         cards = query.order_by(Card.name.asc()).limit(50).all()
         if (not cards) and q:
             if _NUMBER_RE.match(q):
@@ -726,8 +793,15 @@ def create_app() -> Flask:
                 query = Card.query.filter(Card.number == (number.split("/")[0] if "/" in number else number))
                 cards = query.order_by(Card.name.asc()).limit(50).all()
             else:
-                # Importação automática por nome desativada
-                pass
+                # tenta importar por nome quando não há resultados
+                _, set_code, _ = _parse_search_query(q)
+                imported = import_by_name(q, set_code=set_code, limit=30)
+                if imported:
+                    query = Card.query
+                    raw, _ = _tokenize(q)
+                    for t in raw:
+                        query = query.filter(Card.name.ilike(f"%{t}%"))
+                    cards = query.order_by(Card.name.asc()).limit(50).all()
         
         return jsonify([c.as_dict() for c in cards])
 
@@ -745,13 +819,6 @@ def create_app() -> Flask:
             .all()
         )
         return jsonify([h.as_dict() for h in hist])
-
-    @app.get("/api/price_search")
-    def api_price_search():
-        q = (request.args.get("q") or "").strip()
-        if not q:
-            abort(400, "parâmetro q obrigatório")
-        return jsonify(scrape_and_price(q))
 
     @app.post("/price/record")
     def price_record():
