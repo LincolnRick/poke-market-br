@@ -17,16 +17,14 @@
 
         <article class="card p-3">
           <div class="flex gap-3">
-            {% set display_name = i.card.name_pt or i.card.name %}
-            {% set img_url = i.card.image_url_pt or i.card.image_url %}
-            {% if img_url %}
-              <img src="{{ img_url }}" alt="Imagem de {{ display_name }}" class="w-16 h-20 object-cover rounded">
+            {% if i.card.image_url %}
+              <img src="{{ i.card.image_url }}" alt="Imagem de {{ i.card.name }}" class="w-16 h-20 object-cover rounded">
             {% else %}
               <div class="w-16 h-20 bg-slate-200 rounded grid place-items-center text-slate-500 text-xs">sem<br>img</div>
             {% endif %}
 
             <div class="flex-1 min-w-0">
-              <h3 class="font-semibold leading-tight truncate" title="{{ display_name }}">{{ display_name }}</h3>
+              <h3 class="font-semibold leading-tight truncate" title="{{ i.card.name }}">{{ i.card.name }}</h3>
               <p class="text-xs text-slate-500 truncate">
                 {{ i.card.set.name }} • #{{ i.card.number or '—' }}
               </p>

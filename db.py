@@ -90,8 +90,6 @@ class Card(db.Model):
     rarity: Mapped[Optional[str]] = mapped_column(db.String(50))
     type: Mapped[Optional[str]] = mapped_column(db.String(50))
     image_url: Mapped[Optional[str]] = mapped_column(db.String(500))
-    name_pt: Mapped[Optional[str]] = mapped_column(db.String(200), index=True)
-    image_url_pt: Mapped[Optional[str]] = mapped_column(db.String(500))
 
     set_id: Mapped[int] = mapped_column(
         ForeignKey("sets.id", ondelete="CASCADE"), nullable=False, index=True
@@ -106,9 +104,6 @@ class Card(db.Model):
     set: Mapped[Set] = relationship("Set", back_populates="cards", lazy="joined")
     price_history: Mapped[List["PriceHistory"]] = relationship(
         "PriceHistory", back_populates="card", lazy=True, cascade="all, delete-orphan"
-    )
-    search_tokens: Mapped[List["CardSearchToken"]] = relationship(
-        "CardSearchToken", back_populates="card", lazy=True, cascade="all, delete-orphan"
     )
 
     def latest_price(self) -> Optional[float]:
@@ -129,36 +124,16 @@ class Card(db.Model):
         return {
             "id": self.id,
             "name": self.name,
-            "name_pt": self.name_pt,
             "number": self.number,
             "rarity": self.rarity,
             "type": self.type,
             "image_url": self.image_url,
-            "image_url_pt": self.image_url_pt,
             "set": self.set.as_dict() if self.set else None,
             "latest_price": self.latest_price(),
         }
 
     def __repr__(self) -> str:
         return f"<Card id={self.id} name={self.name!r} number={self.number!r} set_id={self.set_id}>"
-
-
-class CardSearchToken(db.Model):
-    """Tokens normalizados para busca rápida de cartas."""
-    __tablename__ = "card_search_tokens"
-    __table_args__ = (
-        UniqueConstraint("card_id", "token", name="uq_cardtoken"),
-        Index("ix_cardtoken_token", "token"),
-    )
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    card_id: Mapped[int] = mapped_column(
-        ForeignKey("cards.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    token: Mapped[str] = mapped_column(db.String(50), nullable=False)
-
-    # Relacionamentos
-    card: Mapped[Card] = relationship("Card", back_populates="search_tokens")
 
 
 class CollectionItem(db.Model):
