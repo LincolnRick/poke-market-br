@@ -46,6 +46,8 @@ class Set(db.Model):
     code: Mapped[Optional[str]] = mapped_column(db.String(32), unique=True, index=True)
     release_date: Mapped[date] = mapped_column(default=date.today, nullable=False)
     icon_url: Mapped[Optional[str]] = mapped_column(db.String(300))
+    series: Mapped[Optional[str]] = mapped_column(db.String(120))
+    total_cards: Mapped[Optional[int]] = mapped_column(db.Integer)
 
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
@@ -57,9 +59,6 @@ class Set(db.Model):
         "Card", back_populates="set", lazy=True, cascade="all, delete-orphan"
     )
 
-    def total_cards(self) -> int:
-        return len(self.cards)
-
     def as_dict(self) -> Dict[str, Any]:
         return {
             "id": self.id,
@@ -67,6 +66,8 @@ class Set(db.Model):
             "code": self.code,
             "release_date": None if self.release_date is None else self.release_date.isoformat(),
             "icon_url": self.icon_url,
+            "series": self.series,
+            "total_cards": self.total_cards,
         }
 
     def __repr__(self) -> str:
@@ -90,6 +91,15 @@ class Card(db.Model):
     rarity: Mapped[Optional[str]] = mapped_column(db.String(50))
     type: Mapped[Optional[str]] = mapped_column(db.String(50))
     image_url: Mapped[Optional[str]] = mapped_column(db.String(500))
+    hp: Mapped[Optional[str]] = mapped_column(db.String(10))
+    category: Mapped[Optional[str]] = mapped_column(db.String(50))
+    subtypes: Mapped[Optional[List[str]]] = mapped_column(db.JSON)
+    evolves_from: Mapped[Optional[str]] = mapped_column(db.String(100))
+    illustrator: Mapped[Optional[str]] = mapped_column(db.String(100))
+    weaknesses: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(db.JSON)
+    resistances: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(db.JSON)
+    retreat_cost: Mapped[Optional[List[str]]] = mapped_column(db.JSON)
+    flavor_text: Mapped[Optional[str]] = mapped_column(db.Text)
 
     set_id: Mapped[int] = mapped_column(
         ForeignKey("sets.id", ondelete="CASCADE"), nullable=False, index=True
@@ -104,6 +114,12 @@ class Card(db.Model):
     set: Mapped[Set] = relationship("Set", back_populates="cards", lazy="joined")
     price_history: Mapped[List["PriceHistory"]] = relationship(
         "PriceHistory", back_populates="card", lazy=True, cascade="all, delete-orphan"
+    )
+    attacks: Mapped[List["CardAttack"]] = relationship(
+        "CardAttack", back_populates="card", lazy=True, cascade="all, delete-orphan"
+    )
+    abilities: Mapped[List["CardAbility"]] = relationship(
+        "CardAbility", back_populates="card", lazy=True, cascade="all, delete-orphan"
     )
 
     def latest_price(self) -> Optional[float]:
@@ -128,12 +144,85 @@ class Card(db.Model):
             "rarity": self.rarity,
             "type": self.type,
             "image_url": self.image_url,
+            "hp": self.hp,
+            "category": self.category,
+            "subtypes": self.subtypes,
+            "evolves_from": self.evolves_from,
+            "illustrator": self.illustrator,
+            "weaknesses": self.weaknesses,
+            "resistances": self.resistances,
+            "retreat_cost": self.retreat_cost,
+            "flavor_text": self.flavor_text,
+            "attacks": [a.as_dict() for a in self.attacks],
+            "abilities": [a.as_dict() for a in self.abilities],
             "set": self.set.as_dict() if self.set else None,
             "latest_price": self.latest_price(),
         }
 
     def __repr__(self) -> str:
         return f"<Card id={self.id} name={self.name!r} number={self.number!r} set_id={self.set_id}>"
+
+
+class CardAttack(db.Model):
+    """Ataque associado a uma carta."""
+    __tablename__ = "card_attacks"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    card_id: Mapped[int] = mapped_column(
+        ForeignKey("cards.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    name: Mapped[str] = mapped_column(db.String(120), nullable=False)
+    cost: Mapped[Optional[List[str]]] = mapped_column(db.JSON)
+    damage: Mapped[Optional[str]] = mapped_column(db.String(50))
+    text: Mapped[Optional[str]] = mapped_column(db.Text)
+
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
+
+    # Relacionamentos
+    card: Mapped[Card] = relationship("Card", back_populates="attacks")
+
+    def as_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "cost": self.cost,
+            "damage": self.damage,
+            "text": self.text,
+        }
+
+
+class CardAbility(db.Model):
+    """Habilidade associada a uma carta."""
+    __tablename__ = "card_abilities"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    card_id: Mapped[int] = mapped_column(
+        ForeignKey("cards.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    name: Mapped[str] = mapped_column(db.String(120), nullable=False)
+    cost: Mapped[Optional[List[str]]] = mapped_column(db.JSON)
+    damage: Mapped[Optional[str]] = mapped_column(db.String(50))
+    text: Mapped[Optional[str]] = mapped_column(db.Text)
+
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
+
+    # Relacionamentos
+    card: Mapped[Card] = relationship("Card", back_populates="abilities")
+
+    def as_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "cost": self.cost,
+            "damage": self.damage,
+            "text": self.text,
+        }
 
 
 class CollectionItem(db.Model):
