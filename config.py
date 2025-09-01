@@ -3,6 +3,7 @@
 # Lê .env e expõe Config com SQLALCHEMY_DATABASE_URI correto.
 # Aceita DB_URL / DATABASE_URL / SQLALCHEMY_DATABASE_URI.
 # Normaliza caminho Windows -> sqlite:///C:/... quando necessário.
+# Agora todas as rotas relativas apontam para a pasta ``instance/``.
 # -----------------------------------------------------------------------------
 
 from __future__ import annotations
@@ -72,14 +73,8 @@ def _get_int(name: str, default: int) -> int:
 
 
 def _resolve_db_uri() -> str:
-    """
-    Escolhe a URI do banco a partir das variáveis conhecidas:
-    1) DB_URL
-    2) DATABASE_URL
-    3) SQLALCHEMY_DATABASE_URI
-    Se nada vier, usa sqlite local ./poke_market.db
-    Também normaliza caminhos Windows sem esquema para sqlite:///C:/...
-    """
+    """Resolve a URI do banco priorizando a pasta ``instance/``."""
+
     raw = (
         os.environ.get("DB_URL")
         or os.environ.get("DATABASE_URL")
@@ -87,19 +82,21 @@ def _resolve_db_uri() -> str:
         or ""
     ).strip()
 
+    root = Path(__file__).resolve().parent
+    instance_dir = root / "instance"
+
+    def _as_sqlite(p: Path) -> str:
+        return f"sqlite:///{p.as_posix()}"
+
     if not raw:
-        # padrão: arquivo local na pasta do projeto
-        here = Path(__file__).resolve().parent
-        return f"sqlite:///{(here / 'poke_market.db').as_posix()}"
+        # padrão: arquivo local em instance/poke_market.db
+        os.makedirs(instance_dir, exist_ok=True)
+        return _as_sqlite(instance_dir / "poke_market.db")
 
-    # se já parece uma URI (tem "://"), retorna como está (mas normaliza barras do sqlite no Windows)
+    # Caso 1: já é URI com esquema
     if "://" in raw:
-        if raw.lower().startswith("sqlite:"):
-            # troca backslash por slash (URI)
-            raw = raw.replace("\\", "/")
-        return raw
+        return raw.replace("\\", "/") if raw.lower().startswith("sqlite:") else raw
 
-    # Se veio um caminho puro do SO (ex.: C:\... ou /home/...):
     p = Path(raw)
     try:
         # no Windows, Path("C:\\...").drive não-vazio indica caminho absoluto
@@ -108,11 +105,14 @@ def _resolve_db_uri() -> str:
         is_abs = False
 
     if is_abs:
-        return f"sqlite:///{p.as_posix()}"
+        os.makedirs(p.parent, exist_ok=True)
+        return _as_sqlite(p)
 
-    # caminho relativo → resolvido a partir do diretório do config.py
-    base = Path(__file__).resolve().parent / raw
-    return f"sqlite:///{base.as_posix()}"
+    # Caminho relativo → dentro de instance/
+    os.makedirs(instance_dir, exist_ok=True)
+    full = instance_dir / p
+    os.makedirs(full.parent, exist_ok=True)
+    return _as_sqlite(full)
 
 
 # --------------------- Config ---------------------
@@ -153,3 +153,4 @@ class Config:
     EBAY_MP_ID = os.environ.get("EBAY_MP_ID", "EBAY_US")
     EBAY_SCOPE = os.environ.get("EBAY_SCOPE", "https://api.ebay.com/oauth/api_scope")
     POKEMONTCG_API_KEY = os.environ.get("POKEMONTCG_API_KEY") or os.environ.get("POKEMON_TCG_API_KEY")
+
