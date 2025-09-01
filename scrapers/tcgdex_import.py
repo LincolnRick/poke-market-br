@@ -6,49 +6,13 @@ Armazena dados básicos das cartas em um SQLite local.
 
 from __future__ import annotations
 
-import os
+from datetime import date
 from typing import Any, Dict, List
 
 import requests
-from sqlalchemy import Column, Float, String, create_engine
-from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
-# Caminho padrão do banco (mesmo arquivo utilizado pelo app principal)
-DB_PATH = "instance/poke_market.db"
-DB_URL = f"sqlite:///{DB_PATH}"
+from db import db, Set, Card
 
-# Garante que a pasta exista
-os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-
-# Conexão SQLAlchemy
-engine = create_engine(DB_URL, future=True)
-SessionLocal = sessionmaker(bind=engine)
-Base = declarative_base()
-
-
-class CardPTBR(Base):
-    """Modelo de carta importada do TCGdex."""
-
-    __tablename__ = "cards_ptbr"
-
-    id = Column(String, primary_key=True)
-    local_id = Column(String)
-    nome = Column(String)
-    raridade = Column(String)
-    tipo = Column(String)
-    categoria = Column(String)
-    set_id = Column(String)
-    set_nome = Column(String)
-    ilustrador = Column(String)
-    imagem_url = Column(String)
-    preco_usd = Column(Float)
-    preco_eur = Column(Float)
-    preco_trend = Column(Float)
-    preco_avg7 = Column(Float)
-
-
-# Cria tabela se não existir
-Base.metadata.create_all(engine)
 
 API_SETS = "https://api.tcgdex.net/v2/pt-br/sets"
 
@@ -79,58 +43,82 @@ def get_cards_from_set(set_id: str) -> List[Dict[str, Any]]:
         return []
 
 
-def save_card_to_db(card_data: Dict[str, Any], session: Session) -> None:
-    """Upsert da carta no banco usando o id como chave primária."""
-    cid = card_data.get("id")
-    if not cid:
+def _find_or_create_set(set_data: Dict[str, Any]) -> Set:
+    """Localiza ou cria um Set usando código ou nome."""
+    code = set_data.get("id") or set_data.get("code")
+    name = set_data.get("name")
+
+    set_obj: Set | None = None
+    if code:
+        set_obj = Set.query.filter_by(code=code).first()
+    if set_obj is None and name:
+        set_obj = Set.query.filter_by(name=name).first()
+
+    if set_obj is None:
+        release_date = date.today()
+        if set_data.get("releaseDate"):
+            try:
+                release_date = date.fromisoformat(set_data["releaseDate"])
+            except ValueError:
+                pass
+        images = set_data.get("images") or {}
+        icon_url = images.get("symbol") or images.get("logo")
+
+        set_obj = Set(code=code, name=name, release_date=release_date, icon_url=icon_url)
+        db.session.add(set_obj)
+        db.session.flush()
+    return set_obj
+
+
+def save_card_to_db(card_data: Dict[str, Any]) -> None:
+    """Upsert da carta usando (set_id, localId)."""
+    set_info = card_data.get("set") or {}
+    set_obj = _find_or_create_set(set_info)
+
+    number = card_data.get("localId")
+    if not number:
         return
-    try:
-        card = session.get(CardPTBR, cid)
-        if card is None:
-            card = CardPTBR(id=cid)
-            session.add(card)
-        card.local_id = card_data.get("localId")
-        card.nome = card_data.get("name")
-        card.raridade = card_data.get("rarity")
-        card.tipo = (card_data.get("types") or [None])[0]
-        card.categoria = card_data.get("category")
-        set_info = card_data.get("set") or {}
-        card.set_id = set_info.get("id")
-        card.set_nome = set_info.get("name")
-        card.ilustrador = card_data.get("illustrator")
-        card.imagem_url = (
-            card_data.get("image")
-            or (card_data.get("images") or {}).get("large")
-            or (card_data.get("images") or {}).get("small")
-        )
-        prices = card_data.get("prices") or {}
-        card.preco_usd = prices.get("usd")
-        card.preco_eur = prices.get("eur")
-        card.preco_trend = prices.get("trend")
-        card.preco_avg7 = prices.get("avg7")
-        session.commit()
-    except Exception as exc:  # noqa: BLE001
-        session.rollback()
-        print(f"Erro ao salvar carta {cid}: {exc}")
+
+    card = Card.query.filter_by(set_id=set_obj.id, number=number).first()
+    if card is None:
+        card = Card(set_id=set_obj.id, number=number)
+        db.session.add(card)
+
+    card.name = card_data.get("name")
+    card.rarity = card_data.get("rarity")
+    card.type = (card_data.get("types") or [None])[0]
+    card.image_url = (
+        card_data.get("image")
+        or (card_data.get("images") or {}).get("large")
+        or (card_data.get("images") or {}).get("small")
+    )
 
 
 def main() -> None:
     """Fluxo principal: importa todas as cartas da API."""
-    session = SessionLocal()
-    sets = get_all_sets()
-    for s in sets:
-        sid = s.get("id")
-        nome = s.get("name")
-        if not sid:
-            continue
-        cards = get_cards_from_set(sid)
-        print(f"Processando conjunto {nome} – {len(cards)} cartas")
-        for card in cards:
+    from app import create_app
+
+    app = create_app()
+    with app.app_context():
+        sets = get_all_sets()
+        for s in sets:
+            sid = s.get("id")
+            nome = s.get("name")
+            if not sid:
+                continue
+            cards = get_cards_from_set(sid)
+            print(f"Processando conjunto {nome} – {len(cards)} cartas")
+            for card in cards:
+                try:
+                    save_card_to_db(card)
+                except Exception as exc:  # noqa: BLE001
+                    db.session.rollback()
+                    print(f"Erro ao processar carta {card.get('id')}: {exc}")
             try:
-                save_card_to_db(card, session)
+                db.session.commit()
             except Exception as exc:  # noqa: BLE001
-                print(f"Erro ao processar carta {card.get('id')}: {exc}")
-    session.close()
+                db.session.rollback()
+                print(f"Erro ao commitar set {nome}: {exc}")
 
 
 if __name__ == "__main__":
