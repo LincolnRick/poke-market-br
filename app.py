@@ -113,59 +113,18 @@ def _set_release_key(s: Optional[Set]) -> Tuple[int, int, int]:
     return (d.year, d.month, d.day)
 
 
-def _resolve_db_uri_for_instance(app: Flask) -> Tuple[str, Optional[str]]:
-    """
-    Resolve a URI de banco priorizando a pasta `instance/`.
-
-    Ordem:
-      1) Se DB_URL/DATABASE_URL/SQLALCHEMY_DATABASE_URI vier com esquema (ex.: sqlite:///C:/..., postgres://),
-         usa como está.
-      2) Se vier um caminho simples/relativo (ex.: 'poke_market.db'), coloca dentro de `instance/`.
-      3) Se nada vier, usa `instance/poke_market.db`.
-
-    Retorna (db_uri, db_file) — db_file só vem preenchido quando for sqlite local.
-    """
-    env_db = (
-        os.getenv("DB_URL")
-        or os.getenv("DATABASE_URL")
-        or os.getenv("SQLALCHEMY_DATABASE_URI")
-        or ""
-    ).strip()
-
-    # Caso 1: já é URI com esquema
-    if env_db and "://" in env_db:
-        uri = env_db.replace("\\", "/") if env_db.lower().startswith("sqlite:") else env_db
-        db_file = None
-        if uri.lower().startswith("sqlite:///"):
-            # tenta extrair caminho local para debug/exists
-            db_file = uri.replace("sqlite:///", "")
-        return uri, db_file
-
-    # Garante pasta instance/
-    os.makedirs(app.instance_path, exist_ok=True)
-
-    # Caso 2: veio um caminho simples?
-    if env_db:
-        db_file = os.path.join(app.instance_path, env_db)
-        return "sqlite:///" + db_file.replace("\\", "/"), db_file
-
-    # Caso 3: nada no ambiente → utiliza poke_market.db como padrão
-    poke = os.path.join(app.instance_path, "poke_market.db")
-    return "sqlite:///" + poke.replace("\\", "/"), poke
-
-
 def create_app() -> Flask:
     # Importante: habilita pasta `instance/`
     app = Flask(__name__, instance_relative_config=True)
 
     # Carrega config base
     app.config.from_object(Config)
-
-    # Força DB dentro da pasta `instance/` (ou respeita URL absoluta)
-    db_uri, db_file = _resolve_db_uri_for_instance(app)
-    app.config["SQLALCHEMY_DATABASE_URI"] = db_uri
-    # Ajustes de engine para sqlite local
-    if db_uri.lower().startswith("sqlite:"):
+    
+    db_uri = app.config.get("SQLALCHEMY_DATABASE_URI", "")
+    db_file: Optional[str] = None
+    if db_uri.lower().startswith("sqlite:///"):
+        db_file = db_uri.replace("sqlite:///", "")
+        os.makedirs(os.path.dirname(db_file), exist_ok=True)
         app.config.setdefault("SQLALCHEMY_ENGINE_OPTIONS", {})
         app.config["SQLALCHEMY_ENGINE_OPTIONS"].setdefault(
             "connect_args", {"check_same_thread": False, "timeout": 15}
@@ -175,9 +134,6 @@ def create_app() -> Flask:
     db.init_app(app)
 
     with app.app_context():
-        # Garante que a pasta do arquivo sqlite exista
-        if db_file:
-            os.makedirs(os.path.dirname(db_file), exist_ok=True)
         db.create_all()
 
     # -------------------------------------------------------------------------
