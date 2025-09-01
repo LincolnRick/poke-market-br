@@ -13,8 +13,8 @@ import requests
 from sqlalchemy import Column, Float, String, create_engine
 from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
-# Caminho padrão do banco
-DB_PATH = "instance/collectr.db"
+# Caminho padrão do banco (mesmo arquivo utilizado pelo app principal)
+DB_PATH = "instance/poke_market.db"
 DB_URL = f"sqlite:///{DB_PATH}"
 
 # Garante que a pasta exista

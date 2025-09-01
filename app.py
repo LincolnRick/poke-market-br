@@ -7,7 +7,7 @@
 # - Exportações CSV
 # - Seed de exemplo
 # - Endpoints manuais de histórico de preços (para registrar valores que você inserir)
-# - Usa banco em `instance/` e, se existir, PRIORIZA `collectr.db`
+# - Usa banco em `instance/` com nome padronizado `poke_market.db` (ou o definido via DB_URL)
 # -----------------------------------------------------------------------------
 
 from __future__ import annotations
@@ -120,10 +120,8 @@ def _resolve_db_uri_for_instance(app: Flask) -> Tuple[str, Optional[str]]:
     Ordem:
       1) Se DB_URL/DATABASE_URL/SQLALCHEMY_DATABASE_URI vier com esquema (ex.: sqlite:///C:/..., postgres://),
          usa como está.
-      2) Se vier um caminho simples/relativo (ex.: 'collectr.db' ou 'poke_market.db'), coloca dentro de `instance/`.
-      3) Se nada vier:
-           - se existir `instance/collectr.db`, usa ELE (compatibilidade com seu banco antigo);
-           - senão, usa `instance/poke_market.db`.
+      2) Se vier um caminho simples/relativo (ex.: 'poke_market.db'), coloca dentro de `instance/`.
+      3) Se nada vier, usa `instance/poke_market.db`.
 
     Retorna (db_uri, db_file) — db_file só vem preenchido quando for sqlite local.
     """
@@ -151,11 +149,9 @@ def _resolve_db_uri_for_instance(app: Flask) -> Tuple[str, Optional[str]]:
         db_file = os.path.join(app.instance_path, env_db)
         return "sqlite:///" + db_file.replace("\\", "/"), db_file
 
-    # Caso 3: nada no ambiente → preferir collectr.db se existir
-    collectr = os.path.join(app.instance_path, "collectr.db")
+    # Caso 3: nada no ambiente → utiliza poke_market.db como padrão
     poke = os.path.join(app.instance_path, "poke_market.db")
-    chosen = collectr if os.path.exists(collectr) else poke
-    return "sqlite:///" + chosen.replace("\\", "/"), chosen
+    return "sqlite:///" + poke.replace("\\", "/"), poke
 
 
 def create_app() -> Flask:
@@ -1113,6 +1109,6 @@ def create_app() -> Flask:
 if __name__ == "__main__":
     app = create_app()
     # Mostra no console onde está o banco
-    print("[collectr] Using DB:", app.config.get("SQLALCHEMY_DATABASE_URI"))
-    print("[collectr] Instance path:", app.instance_path)
+    print("[poke-market] Using DB:", app.config.get("SQLALCHEMY_DATABASE_URI"))
+    print("[poke-market] Instance path:", app.instance_path)
     app.run(debug=True)
