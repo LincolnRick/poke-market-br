@@ -28,6 +28,7 @@
                       <h3 class="font-semibold truncate" title="<a href="{{ url_for('set_view', set_id=s.id) }}" class="underline hover:no-underline">{{ s.name }}</a>"><a href="{{ url_for('set_view', set_id=s.id) }}" class="underline hover:no-underline">{{ s.name }}</a></h3>
                       <p class="text-xs text-slate-500">
                         Código: {{ s.code or '—' }}
+                        {% if s.series %} • Série: {{ s.series }}{% endif %}
                         {% if s.release_date %} • Lançamento: {{ s.release_date.strftime('%d/%m/%Y') }}{% endif %}
                       </p>
                     </div>
