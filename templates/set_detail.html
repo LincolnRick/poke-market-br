@@ -76,7 +76,14 @@
 
         <div class="mt-3">
           <h3 class="font-semibold leading-tight truncate" title="{{ c.name }}">{{ c.name }}</h3>
-          <p class="text-xs text-slate-500 truncate">#{{ c.number or '—' }}{% if c.rarity %} • {{ c.rarity }}{% endif %}</p>
+          <p class="text-xs text-slate-500 truncate">#{{ c.number or '—' }}{% if c.rarity %} • {{ c.rarity }}{% endif %}{% if c.hp %} • HP {{ c.hp }}{% endif %}{% if c.category %} • {{ c.category }}{% endif %}</p>
+          {% if c.attacks %}
+            <ul class="mt-1 text-[11px] text-slate-500 leading-tight">
+              {% for a in c.attacks %}
+                <li>{{ a.name }}{% if a.damage %} — {{ a.damage }}{% endif %}</li>
+              {% endfor %}
+            </ul>
+          {% endif %}
         </div>
       </article>
     {% endfor %}

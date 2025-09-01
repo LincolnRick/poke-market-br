@@ -212,6 +212,9 @@ def create_app() -> Flask:
         q = (request.args.get("q") or "").strip()
         set_id = (request.args.get("set_id") or "").strip()
         rarity = (request.args.get("rarity") or "").strip()
+        series = (request.args.get("series") or "").strip()
+        category = (request.args.get("category") or "").strip()
+        hp = (request.args.get("hp") or "").strip()
         only_missing = (request.args.get("only_missing") == "on")
 
         # Base da consulta local
@@ -241,6 +244,18 @@ def create_app() -> Flask:
         # Filtro por raridade
         if rarity:
             query = query.filter(Card.rarity == rarity)
+
+        # Filtro por série
+        if series:
+            query = query.join(Set).filter(Set.series == series)
+
+        # Filtro por categoria
+        if category:
+            query = query.filter(Card.category == category)
+
+        # Filtro por HP
+        if hp:
+            query = query.filter(Card.hp == hp)
 
         # Primeiro tenta só no banco local
         results = query.order_by(Card.name.asc()).limit(200).all()
@@ -276,6 +291,12 @@ def create_app() -> Flask:
                             pass
                     if rarity:
                         query = query.filter(Card.rarity == rarity)
+                    if series:
+                        query = query.join(Set).filter(Set.series == series)
+                    if category:
+                        query = query.filter(Card.category == category)
+                    if hp:
+                        query = query.filter(Card.hp == hp)
                     results = query.order_by(Card.name.asc()).limit(200).all()
                 else:
                     flash(f"Nenhuma carta oficial encontrada para o número {number}.", "warning")
@@ -310,6 +331,12 @@ def create_app() -> Flask:
                             pass
                     if rarity:
                         query = query.filter(Card.rarity == rarity)
+                    if series:
+                        query = query.join(Set).filter(Set.series == series)
+                    if category:
+                        query = query.filter(Card.category == category)
+                    if hp:
+                        query = query.filter(Card.hp == hp)
                     results = query.order_by(Card.name.asc()).limit(200).all()
                 else:
                     flash(f"Nenhuma carta oficial encontrada pelo nome '{q}'.", "warning")
@@ -327,15 +354,28 @@ def create_app() -> Flask:
             r[0]
             for r in db.session.query(distinct(Card.rarity)).filter(Card.rarity.isnot(None)).all()
         ]
+        series_list = [
+            s[0]
+            for s in db.session.query(distinct(Set.series)).filter(Set.series.isnot(None)).all()
+        ]
+        categories = [
+            c[0]
+            for c in db.session.query(distinct(Card.category)).filter(Card.category.isnot(None)).all()
+        ]
 
         return render_template(
-            "fontes.html",
+            "cards.html",
             results=results,
             sets=sets,
             rarities=rarities,
+            series_list=series_list,
+            categories=categories,
             q=q,
             set_id=set_id,
             rarity=rarity,
+            series=series,
+            category=category,
+            hp=hp,
             only_missing=only_missing,
         )
 
@@ -733,9 +773,19 @@ def create_app() -> Flask:
     # API leve (auto-complete / integrações) + Histórico de preços (manual)
     # -------------------------------------------------------------------------
     @app.get("/api/cards")
+    @app.get("/search")
     def api_cards():
         q = (request.args.get("q") or "").strip()
+        series = (request.args.get("series") or "").strip()
+        category = (request.args.get("category") or "").strip()
+        hp = (request.args.get("hp") or "").strip()
         query = Card.query
+        if series:
+            query = query.join(Set).filter(Set.series == series)
+        if category:
+            query = query.filter(Card.category == category)
+        if hp:
+            query = query.filter(Card.hp == hp)
         if q:
             if _NUMBER_RE.match(q):
                 number = _normalize_print_number(q)
@@ -747,6 +797,12 @@ def create_app() -> Flask:
             if _NUMBER_RE.match(q):
                 number = _normalize_print_number(q)
                 query = Card.query.filter(Card.number == (number.split("/")[0] if "/" in number else number))
+                if series:
+                    query = query.join(Set).filter(Set.series == series)
+                if category:
+                    query = query.filter(Card.category == category)
+                if hp:
+                    query = query.filter(Card.hp == hp)
                 cards = query.order_by(Card.name.asc()).limit(50).all()
             else:
                 # tenta importar por nome quando não há resultados
@@ -757,6 +813,12 @@ def create_app() -> Flask:
                     raw, _ = _tokenize(q)
                     for t in raw:
                         query = query.filter(Card.name.ilike(f"%{t}%"))
+                    if series:
+                        query = query.join(Set).filter(Set.series == series)
+                    if category:
+                        query = query.filter(Card.category == category)
+                    if hp:
+                        query = query.filter(Card.hp == hp)
                     cards = query.order_by(Card.name.asc()).limit(50).all()
         
         return jsonify([c.as_dict() for c in cards])
@@ -956,11 +1018,39 @@ def create_app() -> Flask:
 
     @app.get("/export/cards.csv")
     def export_cards():
-        rows = [["id", "set_id", "set_name", "name", "number", "rarity", "type", "image_url", "created_at", "updated_at"]]
+        rows = [[
+            "id",
+            "set_id",
+            "set_name",
+            "name",
+            "number",
+            "rarity",
+            "type",
+            "category",
+            "hp",
+            "attacks",
+            "image_url",
+            "created_at",
+            "updated_at",
+        ]]
         for c in Card.query.order_by(Card.id.asc()).all():
+            attacks_str = "; ".join(
+                f"{a.name}{' (' + a.damage + ')' if a.damage else ''}" for a in c.attacks
+            )
             rows.append([
-                c.id, c.set_id, c.set.name if c.set else "", c.name, c.number or "",
-                c.rarity or "", c.type or "", c.image_url or "", c.created_at.isoformat(), c.updated_at.isoformat()
+                c.id,
+                c.set_id,
+                c.set.name if c.set else "",
+                c.name,
+                c.number or "",
+                c.rarity or "",
+                c.type or "",
+                c.category or "",
+                c.hp or "",
+                attacks_str,
+                c.image_url or "",
+                c.created_at.isoformat(),
+                c.updated_at.isoformat(),
             ])
         return _csv_response(rows, "cards.csv")
 
