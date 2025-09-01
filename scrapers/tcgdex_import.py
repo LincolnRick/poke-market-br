@@ -7,14 +7,16 @@ Armazena dados básicos das cartas em um SQLite local.
 from __future__ import annotations
 
 from datetime import date
-from typing import Any, Dict, List
+from time import sleep
+from typing import Any, Dict, List, Optional
 
 import requests
 
-from db import db, Set, Card
+from db import db, Set, Card, PriceHistory
 
 
 API_SETS = "https://api.tcgdex.net/v2/pt-br/sets"
+API_CARDS = "https://api.tcgdex.net/v2/pt-br/cards"
 
 
 def get_all_sets() -> List[Dict[str, Any]]:
@@ -42,11 +44,39 @@ def get_set(set_id: str) -> Dict[str, Any]:
         return {}
 
 
-def get_cards_from_set(set_id: str) -> List[Dict[str, Any]]:
-    """Obtém as cartas pertencentes a um conjunto específico."""
-    data = get_set(set_id)
-    cards = data.get("cards")
-    return cards if isinstance(cards, list) else []
+def fetch_card_detail(card_id: str) -> Dict[str, Any]:
+    """Obtém detalhes completos de uma carta específica com retry simples."""
+    url = f"{API_CARDS}/{card_id}"
+    backoff = 1.0
+    for attempt in range(3):
+        try:
+            resp = requests.get(url, timeout=15)
+            resp.raise_for_status()
+            data = resp.json()
+            return data if isinstance(data, dict) else {}
+        except Exception as exc:  # noqa: BLE001
+            print(
+                f"Erro ao obter carta {card_id} (tentativa {attempt + 1}/3): {exc}"
+            )
+            sleep(backoff)
+            backoff *= 2
+    return {}
+
+
+def get_cards_from_set(set_id: str, set_data: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+    """Obtém e enriquece as cartas pertencentes a um conjunto específico."""
+    data = set_data or get_set(set_id)
+    cards = data.get("cards") if isinstance(data, dict) else None
+    if not isinstance(cards, list):
+        return []
+
+    enriched: List[Dict[str, Any]] = []
+    for card in cards:
+        cid = card.get("id")
+        detail = fetch_card_detail(cid) if cid else {}
+        merged = {**card, **detail} if detail else card
+        enriched.append(merged)
+    return enriched
 
 
 def _find_or_create_set(set_data: Dict[str, Any]) -> Set:
@@ -128,12 +158,41 @@ def save_card_to_db(card_data: Dict[str, Any]) -> None:
 
     card.name = card_data.get("name")
     card.rarity = card_data.get("rarity")
-    card.type = (card_data.get("types") or [None])[0]
+    types = card_data.get("types")
+    if isinstance(types, list) and types:
+        card.type = types[0]
+    else:
+        card.type = None
     card.image_url = (
         card_data.get("image")
         or (card_data.get("images") or {}).get("large")
         or (card_data.get("images") or {}).get("small")
     )
+
+    prices = card_data.get("prices")
+    price_value = _extract_price(prices)
+    if price_value is not None:
+        db.session.flush()
+        db.session.add(
+            PriceHistory(card_id=card.id, price=float(price_value), source="tcgdex")
+        )
+
+
+def _extract_price(data: Any) -> Optional[float]:
+    """Extrai o primeiro valor numérico encontrado em uma estrutura de preços."""
+    if isinstance(data, (int, float)):
+        return float(data)
+    if isinstance(data, dict):
+        for val in data.values():
+            price = _extract_price(val)
+            if price is not None:
+                return price
+    if isinstance(data, list):
+        for val in data:
+            price = _extract_price(val)
+            if price is not None:
+                return price
+    return None
 
 
 def main() -> None:
@@ -149,7 +208,7 @@ def main() -> None:
                 continue
             set_data = get_set(sid)
             set_obj = upsert_set(set_data)
-            cards = set_data.get("cards") or []
+            cards = get_cards_from_set(sid, set_data)
             print(f"Processando conjunto {set_obj.name} – {len(cards)} cartas")
             for card in cards:
                 try:
