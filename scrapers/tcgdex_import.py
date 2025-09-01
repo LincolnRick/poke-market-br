@@ -29,18 +29,24 @@ def get_all_sets() -> List[Dict[str, Any]]:
         return []
 
 
-def get_cards_from_set(set_id: str) -> List[Dict[str, Any]]:
-    """Obtém as cartas pertencentes a um conjunto específico."""
+def get_set(set_id: str) -> Dict[str, Any]:
+    """Obtém informações detalhadas de um set específico."""
     url = f"{API_SETS}/{set_id}"
     try:
         resp = requests.get(url, timeout=15)
         resp.raise_for_status()
         data = resp.json()
-        cards = data.get("cards")
-        return cards if isinstance(cards, list) else []
+        return data if isinstance(data, dict) else {}
     except Exception as exc:  # noqa: BLE001
-        print(f"Erro ao obter cartas do set {set_id}: {exc}")
-        return []
+        print(f"Erro ao obter set {set_id}: {exc}")
+        return {}
+
+
+def get_cards_from_set(set_id: str) -> List[Dict[str, Any]]:
+    """Obtém as cartas pertencentes a um conjunto específico."""
+    data = get_set(set_id)
+    cards = data.get("cards")
+    return cards if isinstance(cards, list) else []
 
 
 def _find_or_create_set(set_data: Dict[str, Any]) -> Set:
@@ -67,6 +73,42 @@ def _find_or_create_set(set_data: Dict[str, Any]) -> Set:
         set_obj = Set(code=code, name=name, release_date=release_date, icon_url=icon_url)
         db.session.add(set_obj)
         db.session.flush()
+    return set_obj
+
+
+def upsert_set(tcgdex_set: Dict[str, Any]) -> Set:
+    """Upsert de um Set baseado no JSON retornado pela API."""
+    code = tcgdex_set.get("id")
+    name = tcgdex_set.get("name")
+
+    set_obj: Set | None = None
+    if code:
+        set_obj = Set.query.filter_by(code=code).first()
+    if set_obj is None and name:
+        set_obj = Set.query.filter_by(name=name).first()
+
+    if set_obj is None:
+        set_obj = Set(code=code, name=name or "")
+        db.session.add(set_obj)
+
+    if name:
+        set_obj.name = name
+    if code:
+        set_obj.code = code
+
+    release_date = tcgdex_set.get("releaseDate")
+    if release_date:
+        try:
+            set_obj.release_date = date.fromisoformat(release_date)
+        except ValueError:
+            pass
+
+    images = tcgdex_set.get("images") or {}
+    icon_url = images.get("symbol") or images.get("logo")
+    if icon_url:
+        set_obj.icon_url = icon_url
+
+    db.session.flush()
     return set_obj
 
 
@@ -103,11 +145,12 @@ def main() -> None:
         sets = get_all_sets()
         for s in sets:
             sid = s.get("id")
-            nome = s.get("name")
             if not sid:
                 continue
-            cards = get_cards_from_set(sid)
-            print(f"Processando conjunto {nome} – {len(cards)} cartas")
+            set_data = get_set(sid)
+            set_obj = upsert_set(set_data)
+            cards = set_data.get("cards") or []
+            print(f"Processando conjunto {set_obj.name} – {len(cards)} cartas")
             for card in cards:
                 try:
                     save_card_to_db(card)
@@ -118,7 +161,7 @@ def main() -> None:
                 db.session.commit()
             except Exception as exc:  # noqa: BLE001
                 db.session.rollback()
-                print(f"Erro ao commitar set {nome}: {exc}")
+                print(f"Erro ao commitar set {set_obj.name}: {exc}")
 
 
 if __name__ == "__main__":
