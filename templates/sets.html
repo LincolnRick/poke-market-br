@@ -25,7 +25,7 @@
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center justify-between gap-3">
                     <div class="min-w-0">
-                      <h3 class="font-semibold truncate" title="<a href="{{ url_for('set_view', set_id=s.id) }}" class="underline hover:no-underline">{{ s.name }}</a>"><a href="{{ url_for('set_view', set_id=s.id) }}" class="underline hover:no-underline">{{ s.name }}</a></h3>
+                      <h3 class="font-semibold truncate" title="{{ s.name }}"><a href="{{ url_for('set_view', set_id=s.id) }}" class="underline hover:no-underline">{{ s.name }}</a></h3>
                       <p class="text-xs text-slate-500">
                         Código: {{ s.code or '—' }}
                         {% if s.series %} • Série: {{ s.series }}{% endif %}
