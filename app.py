@@ -171,8 +171,12 @@ def create_app() -> Flask:
         progress = []
         for s in sets:
             set_total = (
-                db.session.query(func.count(Card.id)).filter(Card.set_id == s.id).scalar()
-                or 0
+                s.total_cards
+                if s.total_cards is not None
+                else (
+                    db.session.query(func.count(Card.id)).filter(Card.set_id == s.id).scalar()
+                    or 0
+                )
             )
             owned_distinct = (
                 db.session.query(func.count(distinct(CollectionItem.card_id)))
