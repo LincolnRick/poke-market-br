@@ -151,6 +151,20 @@ Manter sincronização depois via API (opção A) apenas para novos sets/cartas.
 
 Se desejar, mantemos um script import_tcgdex_repo_pt.py no mesmo padrão (idempotente, logs, upsert).
 
+Opção C — Liga Pokémon (scraper)
+
+Quando precisar importar cartas diretamente do site da Liga Pokémon, use o
+script de seeding dedicado:
+
+```
+python seed_ligapokemon_cards.py --edids 706 707
+```
+
+Basta informar os `edids` das edições que deseja carregar. O script cria
+os sets automaticamente (quando ausentes) e realiza *upsert* das cartas
+com base na constraint de unicidade `(set_id, number)`, permitindo
+execuções idempotentes.
+
 Rotas principais (MVP)
 
 Podem variar conforme sua versão; abaixo, o intento do MVP.
