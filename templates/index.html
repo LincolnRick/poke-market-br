@@ -141,9 +141,15 @@
         <article class="card p-2">
           <div class="relative">
             {% if i.card.image_url %}
-              <img src="{{ i.card.image_url }}"
-                   alt="Imagem de {{ i.card.name }}"
-                   class="w-full aspect-[3/4] object-cover rounded-lg">
+              {% if i.card.image_url.startswith('http') %}
+                <img src="{{ i.card.image_url }}"
+                     alt="Imagem de {{ i.card.name }}"
+                     class="w-full aspect-[3/4] object-cover rounded-lg">
+              {% else %}
+                <img src="{{ url_for('static', filename=i.card.image_url) }}"
+                     alt="Imagem de {{ i.card.name }}"
+                     class="w-full aspect-[3/4] object-cover rounded-lg">
+              {% endif %}
             {% else %}
               <div class="w-full aspect-[3/4] bg-slate-200 rounded-lg grid place-items-center text-slate-500">
                 sem imagem

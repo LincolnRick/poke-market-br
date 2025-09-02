@@ -60,7 +60,11 @@
 
         <div class="relative mt-2">
           {% if c.image_url %}
-            <img src="{{ c.image_url }}" alt="Imagem de {{ c.name }}" class="w-full aspect-[3/4] object-cover rounded-xl">
+            {% if c.image_url.startswith('http') %}
+              <img src="{{ c.image_url }}" alt="Imagem de {{ c.name }}" class="w-full aspect-[3/4] object-cover rounded-xl">
+            {% else %}
+              <img src="{{ url_for('static', filename=c.image_url) }}" alt="Imagem de {{ c.name }}" class="w-full aspect-[3/4] object-cover rounded-xl">
+            {% endif %}
           {% else %}
             <div class="w-full aspect-[3/4] rounded-xl" style="border:1px dashed #d9e6d9; background:linear-gradient(120deg,#f8fcf8,#f1f6f1); display:grid; place-items:center; color:#2c452c;">sem imagem</div>
           {% endif %}

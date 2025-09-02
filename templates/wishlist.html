@@ -18,7 +18,11 @@
         <article class="card p-3">
           <div class="flex gap-3">
             {% if i.card.image_url %}
-              <img src="{{ i.card.image_url }}" alt="Imagem de {{ i.card.name }}" class="w-16 h-20 object-cover rounded">
+              {% if i.card.image_url.startswith('http') %}
+                <img src="{{ i.card.image_url }}" alt="Imagem de {{ i.card.name }}" class="w-16 h-20 object-cover rounded">
+              {% else %}
+                <img src="{{ url_for('static', filename=i.card.image_url) }}" alt="Imagem de {{ i.card.name }}" class="w-16 h-20 object-cover rounded">
+              {% endif %}
             {% else %}
               <div class="w-16 h-20 bg-slate-200 rounded grid place-items-center text-slate-500 text-xs">sem<br>img</div>
             {% endif %}
