@@ -105,6 +105,7 @@ class Card(db.Model):
     holo: Mapped[Optional[str]] = mapped_column(db.String(30))
     material: Mapped[Optional[str]] = mapped_column(db.String(30))
     edition: Mapped[Optional[str]] = mapped_column(db.String(30))
+    legalities: Mapped[Optional[Dict[str, Any]]] = mapped_column(db.JSON)
 
     set_id: Mapped[int] = mapped_column(
         ForeignKey("sets.id", ondelete="CASCADE"), nullable=False, index=True
@@ -163,6 +164,7 @@ class Card(db.Model):
             "holo": self.holo,
             "material": self.material,
             "edition": self.edition,
+            "legalities": self.legalities,
             "attacks": [a.as_dict() for a in self.attacks],
             "abilities": [a.as_dict() for a in self.abilities],
             "set": self.set.as_dict() if self.set else None,

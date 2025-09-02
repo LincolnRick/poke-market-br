@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional
 
 import requests
 
-from db import db, Set, Card, PriceHistory
+from db import db, Set, Card, PriceHistory, CardAttack, CardAbility
 
 
 API_SETS = "https://api.tcgdex.net/v2/pt-br/sets"
@@ -99,10 +99,25 @@ def _find_or_create_set(set_data: Dict[str, Any]) -> Set:
                 pass
         images = set_data.get("images") or {}
         icon_url = images.get("symbol") or images.get("logo")
-
         set_obj = Set(code=code, name=name, release_date=release_date, icon_url=icon_url)
         db.session.add(set_obj)
-        db.session.flush()
+
+    series = set_data.get("serie") or set_data.get("series")
+    if series:
+        set_obj.series = series
+
+    total_cards = set_data.get("total") or set_data.get("totalCards")
+    if total_cards is None:
+        cards = set_data.get("cards")
+        if isinstance(cards, list):
+            total_cards = len(cards)
+    if total_cards is not None:
+        try:
+            set_obj.total_cards = int(total_cards)
+        except (TypeError, ValueError):
+            pass
+
+    db.session.flush()
     return set_obj
 
 
@@ -137,6 +152,21 @@ def upsert_set(tcgdex_set: Dict[str, Any]) -> Set:
     icon_url = images.get("symbol") or images.get("logo")
     if icon_url:
         set_obj.icon_url = icon_url
+
+    series = tcgdex_set.get("serie") or tcgdex_set.get("series")
+    if series:
+        set_obj.series = series
+
+    total_cards = tcgdex_set.get("total") or tcgdex_set.get("totalCards")
+    if total_cards is None:
+        cards = tcgdex_set.get("cards")
+        if isinstance(cards, list):
+            total_cards = len(cards)
+    if total_cards is not None:
+        try:
+            set_obj.total_cards = int(total_cards)
+        except (TypeError, ValueError):
+            pass
 
     db.session.flush()
     return set_obj
@@ -192,13 +222,71 @@ def save_card_to_db(card_data: Dict[str, Any]) -> None:
     card.image_url = image_url
     card.language = card_data.get("language") or "português"
 
+    card.hp = card_data.get("hp")
+    card.category = card_data.get("category") or card_data.get("supertype")
+    subtypes = card_data.get("subtypes")
+    card.subtypes = subtypes if isinstance(subtypes, list) else None
+    card.evolves_from = card_data.get("evolvesFrom") or card_data.get("evolves_from")
+    card.illustrator = card_data.get("illustrator")
+    card.weaknesses = card_data.get("weaknesses")
+    card.resistances = card_data.get("resistances")
+    retreat_cost = card_data.get("retreatCost")
+    card.retreat_cost = retreat_cost if isinstance(retreat_cost, list) else None
+    card.flavor_text = card_data.get("flavorText") or card_data.get("flavor_text")
+    card.border = card_data.get("border")
+    variants = card_data.get("variants") or {}
+    if isinstance(variants, dict):
+        card.holo = variants.get("holo")
+        card.material = variants.get("material")
+        card.edition = variants.get("edition")
+    else:
+        card.holo = card_data.get("holo")
+        card.material = card_data.get("material")
+        card.edition = card_data.get("edition")
+    card.legalities = card_data.get("legalities")
+
+    db.session.flush()
+
     prices = card_data.get("prices")
     price_value = _extract_price(prices)
     if price_value is not None:
-        db.session.flush()
         db.session.add(
             PriceHistory(card_id=card.id, price=float(price_value), source="tcgdex")
         )
+
+    attacks = card_data.get("attacks")
+    if isinstance(attacks, list):
+        CardAttack.query.filter_by(card_id=card.id).delete()
+        for atk in attacks:
+            name = atk.get("name")
+            if not name:
+                continue
+            db.session.add(
+                CardAttack(
+                    card_id=card.id,
+                    name=name,
+                    cost=atk.get("cost"),
+                    damage=atk.get("damage"),
+                    text=atk.get("text") or atk.get("effect"),
+                )
+            )
+
+    abilities = card_data.get("abilities")
+    if isinstance(abilities, list):
+        CardAbility.query.filter_by(card_id=card.id).delete()
+        for ability in abilities:
+            name = ability.get("name")
+            if not name:
+                continue
+            db.session.add(
+                CardAbility(
+                    card_id=card.id,
+                    name=name,
+                    cost=ability.get("cost"),
+                    damage=ability.get("damage"),
+                    text=ability.get("text") or ability.get("effect"),
+                )
+            )
 
 
 def _extract_price(data: Any) -> Optional[float]:
