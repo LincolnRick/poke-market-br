@@ -65,6 +65,12 @@ def _import_sets(set_ids: Optional[Iterable[str]] = None) -> None:
         print(f"[seed_tcgdex_cards] {set_obj.name}: {len(cards)} cartas")
         for card in cards:
             try:
+                lang = "pt-br"
+                series_id = card.get("set", {}).get("serie", {}).get("id")
+                set_id = card.get("set", {}).get("id")
+                card_id = card.get("localId")
+                image_url = f"https://assets.tcgdex.net/{lang}/{series_id}/{set_id}/{card_id}/high.png"
+                card["image_url"] = image_url
                 tcgdex_import.save_card_to_db(card)
             except Exception as exc:  # noqa: BLE001
                 db.session.rollback()
