@@ -99,6 +99,14 @@ def _import_sets(set_ids: Optional[Iterable[str]] = None, lang: str = "pt-br") -
                 card_id = card.get("localId") or ""
                 image_url = tcgdex_import.build_card_image_url(
                     card_lang, series_id, set_id, card_id,
+                        or ""
+                    )
+                else:
+                    series_id = serie_info or ""
+                set_id = card.get("set", {}).get("id") or ""
+                card_id = card.get("localId") or ""
+                image_url = tcgdex_import.build_card_image_url(
+                    card_lang, series_id, set_id, card_id
                 )
                 card["image_url"] = image_url
                 card["language"] = card_lang
