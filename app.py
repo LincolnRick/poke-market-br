@@ -45,13 +45,6 @@ from db import (
     kpi_wishlist_count,
     kpi_total_estimated_value,
 )
-from pokemontcg_import import (
-    import_by_print_number,
-    import_by_name,
-    import_hybrid,
-    import_set,
-    ensure_single_by_number,
-)
 
 _NUMBER_RE = re.compile(r'^\s*\d+(?:\s*/\s*\d+)?\s*$')
 
@@ -61,6 +54,13 @@ def _normalize_print_number(raw: str) -> str:
         return ""
     text = raw.strip()
     return re.sub(r"\s*/\s*", "/", text)
+
+
+def ensure_single_by_number(number: str) -> Optional[Card]:
+    """Retorna a carta única para o número fornecido ou None."""
+    norm = number.split("/")[0] if "/" in number else number
+    cards = Card.query.filter(Card.number == norm).all()
+    return cards[0] if len(cards) == 1 else None
 
 
 
@@ -260,87 +260,6 @@ def create_app() -> Flask:
         # Primeiro tenta só no banco local
         results = query.order_by(Card.name.asc()).limit(200).all()
 
-        # -------------------------
-        # Auto-import quando vazio
-        # -------------------------
-        if (not results) and q:
-            if _NUMBER_RE.match(q):
-                # Importa por número (suporta "X/Y" e "X")
-                number = _normalize_print_number(q)
-
-                # Se o usuário já escolheu um set na UI, tente restringir
-                chosen_set_code = None
-                if set_id:
-                    try:
-                        s = db.session.get(Set, int(set_id))
-                        chosen_set_code = getattr(s, "code", None)
-                    except Exception:
-                        pass
-
-                imported = import_by_print_number(number, set_code=chosen_set_code)
-                if imported:
-                    flash(f"Importadas {len(imported)} carta(s) pelo número {number}.", "info")
-                    # Reexecuta a busca local com os mesmos filtros
-                    query = Card.query.filter(
-                        Card.number == (number.split("/")[0] if "/" in number else number)
-                    )
-                    if set_id:
-                        try:
-                            query = query.filter(Card.set_id == int(set_id))
-                        except ValueError:
-                            pass
-                    if rarity:
-                        query = query.filter(Card.rarity == rarity)
-                    if series:
-                        query = query.join(Set).filter(Set.series == series)
-                    if category:
-                        query = query.filter(Card.category == category)
-                    if hp:
-                        query = query.filter(Card.hp == hp)
-                    results = query.order_by(Card.name.asc()).limit(200).all()
-                else:
-                    flash(f"Nenhuma carta oficial encontrada para o número {number}.", "warning")
-
-            else:
-                # Importa por nome (com suporte a "set_code" embutido no texto, ex.: "Psyduck sm9")
-                _number, set_code_hint, _parts = _parse_search_query(q)
-
-                # Se o usuário escolheu set no seletor, isso tem prioridade sobre o hint do texto
-                chosen_set_code = None
-                if set_id:
-                    try:
-                        s = db.session.get(Set, int(set_id))
-                        chosen_set_code = getattr(s, "code", None)
-                    except Exception:
-                        pass
-                if not chosen_set_code:
-                    chosen_set_code = set_code_hint
-
-                imported = import_by_name(q, set_code=chosen_set_code, limit=60)
-                if imported:
-                    flash(f"Importadas {len(imported)} carta(s) pelo nome '{q}'.", "info")
-                    # Reexecuta a busca local com tokenização (AND)
-                    query = Card.query
-                    raw_tokens, _ = _tokenize(q)
-                    for t in raw_tokens:
-                        query = query.filter(Card.name.ilike(f"%{t}%"))
-                    if set_id:
-                        try:
-                            query = query.filter(Card.set_id == int(set_id))
-                        except ValueError:
-                            pass
-                    if rarity:
-                        query = query.filter(Card.rarity == rarity)
-                    if series:
-                        query = query.join(Set).filter(Set.series == series)
-                    if category:
-                        query = query.filter(Card.category == category)
-                    if hp:
-                        query = query.filter(Card.hp == hp)
-                    results = query.order_by(Card.name.asc()).limit(200).all()
-                else:
-                    flash(f"Nenhuma carta oficial encontrada pelo nome '{q}'.", "warning")
-
         # Apenas não possuídas (aplica no final, para funcionar tanto com local quanto após import)
         if only_missing and results:
             owned_ids = {
@@ -470,7 +389,6 @@ def create_app() -> Flask:
             number = _normalize_print_number(number_raw)
 
             if set_code:
-                # join correto entre Card e Set
                 target_card = (
                     Card.query.join(Set, Card.set_id == Set.id)
                     .filter(
@@ -480,31 +398,11 @@ def create_app() -> Flask:
                     .first()
                 )
                 if not target_card:
-                    import_by_print_number(number, set_code=set_code)
-                    target_card = (
-                        Card.query.join(Set, Card.set_id == Set.id)
-                        .filter(
-                            Card.number == (number.split("/")[0] if "/" in number else number),
-                            Set.code == set_code,
-                        )
-                        .first()
-                    )
-                    if not target_card:
-                        import_set(set_code)
-                        target_card = (
-                            Card.query.join(Set, Card.set_id == Set.id)
-                            .filter(
-                                Card.number == (number.split("/")[0] if "/" in number else number),
-                                Set.code == set_code,
-                            )
-                            .first()
-                        )
-                if not target_card:
                     abort(404, f"Carta {number} não encontrada no set {set_code}.")
             else:
                 target_card = ensure_single_by_number(number)
                 if not target_card:
-                    abort(404, f"Nenhuma carta encontrada para o número {number}.")
+                    abort(404, f"Nenhuma carta única encontrada para o número {number}; informe o set.")
 
         qty = int(data.get("quantity", 1) or 1)
         qty = max(1, qty)
@@ -804,22 +702,6 @@ def create_app() -> Flask:
                 if hp:
                     query = query.filter(Card.hp == hp)
                 cards = query.order_by(Card.name.asc()).limit(50).all()
-            else:
-                # tenta importar por nome quando não há resultados
-                _, set_code, _ = _parse_search_query(q)
-                imported = import_by_name(q, set_code=set_code, limit=30)
-                if imported:
-                    query = Card.query
-                    raw, _ = _tokenize(q)
-                    for t in raw:
-                        query = query.filter(Card.name.ilike(f"%{t}%"))
-                    if series:
-                        query = query.join(Set).filter(Set.series == series)
-                    if category:
-                        query = query.filter(Card.category == category)
-                    if hp:
-                        query = query.filter(Card.hp == hp)
-                    cards = query.order_by(Card.name.asc()).limit(50).all()
         
         return jsonify([c.as_dict() for c in cards])
 
@@ -1109,7 +991,7 @@ def create_app() -> Flask:
                 number="58/102",
                 rarity="Common",
                 type="Electric",
-                image_url="https://images.pokemontcg.io/base1/58_hires.png",
+                image_url="https://assets.tcgdex.net/pt/base/base1/58/high.png",
                 set_id=base.id,
             ),
             Card(
@@ -1117,7 +999,7 @@ def create_app() -> Flask:
                 number="4/102",
                 rarity="Holo Rare",
                 type="Fire",
-                image_url="https://images.pokemontcg.io/base1/4_hires.png",
+                image_url="https://assets.tcgdex.net/pt/base/base1/4/high.png",
                 set_id=base.id,
             ),
             Card(
@@ -1125,7 +1007,7 @@ def create_app() -> Flask:
                 number="2/102",
                 rarity="Holo Rare",
                 type="Water",
-                image_url="https://images.pokemontcg.io/base1/2_hires.png",
+                image_url="https://assets.tcgdex.net/pt/base/base1/2/high.png",
                 set_id=base.id,
             ),
             Card(
@@ -1133,7 +1015,7 @@ def create_app() -> Flask:
                 number="44/102",
                 rarity="Common",
                 type="Grass",
-                image_url="https://images.pokemontcg.io/base1/44_hires.png",
+                image_url="https://assets.tcgdex.net/pt/base/base1/44/high.png",
                 set_id=base.id,
             ),
         ]

@@ -6,7 +6,7 @@
   <header class="mb-4">
     <h1 class="text-2xl font-semibold">Buscar cartas</h1>
     <p class="text-slate-500 text-sm mt-1">
-      Para agilizar, use <b>Adicionar por número</b> (ex.: <code>65/82</code>). Se a carta não existir no catálogo local, tentaremos <b>importar automaticamente</b> antes de adicionar.
+      Para agilizar, use <b>Adicionar por número</b> (ex.: <code>65/82</code>). Caso a carta não exista no catálogo local, será exibida uma mensagem de erro.
     </p>
   </header>
 
@@ -163,6 +163,16 @@
             <p class="text-xs text-slate-500 truncate">
               {% if c.set %}<a href="{{ url_for('set_view', set_id=c.set.id) }}" class="underline hover:no-underline">{{ c.set.name }}</a>{% else %}—{% endif %} • #{{ c.number or '—' }}{% if c.rarity %} • {{ c.rarity }}{% endif %}{% if c.hp %} • HP {{ c.hp }}{% endif %}{% if c.category %} • {{ c.category }}{% endif %}
             </p>
+            {% if c.type or c.subtypes %}
+              <p class="text-xs text-slate-500 truncate">
+                {% if c.type %}{{ c.type }}{% endif %}{% if c.subtypes %} • {{ c.subtypes|join(', ') }}{% endif %}
+              </p>
+            {% endif %}
+            {% if c.language or c.border or c.holo or c.material or c.edition %}
+              <p class="text-xs text-slate-500 truncate">
+                {% if c.language %}{{ c.language }}{% endif %}{% if c.border %} • Borda {{ c.border }}{% endif %}{% if c.holo %} • {{ c.holo }}{% endif %}{% if c.material %} • {{ c.material }}{% endif %}{% if c.edition %} • {{ c.edition }}{% endif %}
+              </p>
+            {% endif %}
             {% if c.attacks %}
               <ul class="mt-1 text-[11px] text-slate-500 leading-tight">
                 {% for a in c.attacks %}
