@@ -11,6 +11,10 @@ from time import sleep
 from typing import Any, Dict, List, Optional
 
 import requests
+from requests.adapters import HTTPAdapter
+from requests.exceptions import RequestException
+from urllib3.util.retry import Retry
+from http.client import RemoteDisconnected
 
 from db import db, Set, Card, PriceHistory, CardAttack, CardAbility
 
@@ -19,14 +23,25 @@ API_SETS = "https://api.tcgdex.net/v2/pt-br/sets"
 API_CARDS = "https://api.tcgdex.net/v2/pt-br/cards"
 
 
+session = requests.Session()
+retry_strategy = Retry(
+    total=5,
+    backoff_factor=1,
+    status_forcelist=[429, 500, 502, 503, 504],
+)
+adapter = HTTPAdapter(max_retries=retry_strategy)
+session.mount("https://", adapter)
+session.mount("http://", adapter)
+
+
 def get_all_sets() -> List[Dict[str, Any]]:
     """Obtém todos os conjuntos disponíveis em pt-br."""
     try:
-        resp = requests.get(API_SETS, timeout=15)
+        resp = session.get(API_SETS, timeout=15)
         resp.raise_for_status()
         data = resp.json()
         return data if isinstance(data, list) else []
-    except Exception as exc:  # noqa: BLE001
+    except RequestException as exc:
         print(f"Erro ao obter conjuntos: {exc}")
         return []
 
@@ -35,11 +50,11 @@ def get_set(set_id: str) -> Dict[str, Any]:
     """Obtém informações detalhadas de um set específico."""
     url = f"{API_SETS}/{set_id}"
     try:
-        resp = requests.get(url, timeout=15)
+        resp = session.get(url, timeout=15)
         resp.raise_for_status()
         data = resp.json()
         return data if isinstance(data, dict) else {}
-    except Exception as exc:  # noqa: BLE001
+    except RequestException as exc:
         print(f"Erro ao obter set {set_id}: {exc}")
         return {}
 
@@ -47,19 +62,25 @@ def get_set(set_id: str) -> Dict[str, Any]:
 def fetch_card_detail(card_id: str) -> Dict[str, Any]:
     """Obtém detalhes completos de uma carta específica com retry simples."""
     url = f"{API_CARDS}/{card_id}"
-    backoff = 1.0
-    for attempt in range(3):
+    backoff = 1
+    for attempt in range(5):
         try:
-            resp = requests.get(url, timeout=15)
+            resp = session.get(url, timeout=15)
             resp.raise_for_status()
             data = resp.json()
             return data if isinstance(data, dict) else {}
-        except Exception as exc:  # noqa: BLE001
+        except RequestException as exc:
             print(
-                f"Erro ao obter carta {card_id} (tentativa {attempt + 1}/3): {exc}"
+                f"Erro ao obter carta {card_id} (tentativa {attempt + 1}/5): {exc}"
             )
+            cause = getattr(exc, "__cause__", None)
+            if isinstance(cause, RemoteDisconnected):
+                sleep(backoff)
+                backoff += 1
+                continue
             sleep(backoff)
-            backoff *= 2
+            backoff += 1
+    print(f"Falha ao obter carta {card_id} após 5 tentativas")
     return {}
 
 
