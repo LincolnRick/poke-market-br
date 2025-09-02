@@ -1,6 +1,6 @@
 """seed_tcgdex_cards.py
 ---------------------------------
-Seed de cartas em Português via API TCGdex.
+Seed de cartas via API TCGdex, permitindo escolher o idioma.
 
 Uso:
     python seed_tcgdex_cards.py                     # importa todos os sets
@@ -47,8 +47,11 @@ def _resolve_sets(identifiers: Iterable[str]) -> list[dict]:
     return result
 
 
-def _import_sets(set_ids: Optional[Iterable[str]] = None) -> None:
+def _import_sets(set_ids: Optional[Iterable[str]] = None, lang: str = "pt-br") -> None:
     """Importa sets e cartas usando a API TCGdex."""
+    tcgdex_import.API_SETS = f"https://api.tcgdex.net/v2/{lang}/sets"
+    tcgdex_import.API_CARDS = f"https://api.tcgdex.net/v2/{lang}/cards"
+
     if set_ids:
         sets_data = _resolve_sets(set_ids)
     else:
@@ -65,12 +68,27 @@ def _import_sets(set_ids: Optional[Iterable[str]] = None) -> None:
         print(f"[seed_tcgdex_cards] {set_obj.name}: {len(cards)} cartas")
         for card in cards:
             try:
-                lang = "pt-br"
-                series_id = card.get("set", {}).get("serie", {}).get("id")
-                set_id = card.get("set", {}).get("id")
-                card_id = card.get("localId")
-                image_url = f"https://assets.tcgdex.net/{lang}/{series_id}/{set_id}/{card_id}/high.png"
+                card_lang = card.get("language") or lang
+                serie_info = (
+                    card.get("set", {}).get("serie")
+                    or card.get("set", {}).get("series")
+                    or {}
+                )
+                if isinstance(serie_info, dict):
+                    series_id = (
+                        serie_info.get("id")
+                        or serie_info.get("name")
+                        or ""
+                    )
+                else:
+                    series_id = serie_info or ""
+                set_id = card.get("set", {}).get("id") or ""
+                card_id = card.get("localId") or ""
+                image_url = tcgdex_import.build_card_image_url(
+                    card_lang, series_id, set_id, card_id
+                )
                 card["image_url"] = image_url
+                card["language"] = card_lang
                 tcgdex_import.save_card_to_db(card)
             except Exception as exc:  # noqa: BLE001
                 db.session.rollback()
@@ -84,18 +102,23 @@ def _import_sets(set_ids: Optional[Iterable[str]] = None) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Seed de cartas via API TCGdex (pt-br).",
+        description="Seed de cartas via API TCGdex.",
     )
     parser.add_argument(
         "--sets",
         nargs="*",
         help="IDs dos sets a importar; se omitido, importa todos",
     )
+    parser.add_argument(
+        "--lang",
+        default="pt-br",
+        help="Idioma dos dados (ex: en, pt-br)",
+    )
     args = parser.parse_args()
 
     app = create_app()
     with app.app_context():
-        _import_sets(args.sets)
+        _import_sets(args.sets, args.lang)
 
 
 if __name__ == "__main__":
