@@ -261,7 +261,13 @@ def save_card_to_db(card_data: Dict[str, Any]) -> None:
         urls_to_try = [image_url]
         base_url = image_url.split("?")[0]
         if not base_url.lower().endswith((".png", ".jpg", ".jpeg")):
-            urls_to_try.extend([f"{image_url}.png", f"{image_url}.jpg"])
+            urls_to_try.extend([f"{base_url}.png", f"{base_url}.jpg"])
+            if "assets.tcgdex.net" in base_url:
+                path = base_url.split("assets.tcgdex.net")[-1]
+                urls_to_try.extend([
+                    f"https://tcgdex.dev/assets{path}.png?ref=assets.tcgdex.net",
+                    f"https://tcgdex.dev/assets{path}.jpg?ref=assets.tcgdex.net",
+                ])
         last_exc: RequestException | None = None
         for url in urls_to_try:
             try:
