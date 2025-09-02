@@ -59,12 +59,25 @@ def _import_sets(set_ids: Optional[Iterable[str]] = None, lang: str = "pt-br") -
         sets_list = tcgdex_import.get_all_sets()
         sets_data = [tcgdex_import.get_set(s.get("id")) for s in sets_list if s.get("id")]
 
+
     for data in sets_data:
         sid = data.get("id")
         if not sid:
             continue
         set_obj = tcgdex_import.upsert_set(data)
         cards = tcgdex_import.get_cards_from_set(sid, data)
+
+        # série do set usada como fallback quando a carta não informa
+        set_serie_info = data.get("serie") or data.get("series") or {}
+        if isinstance(set_serie_info, dict):
+            default_series_id = (
+                set_serie_info.get("id")
+                or set_serie_info.get("name")
+                or ""
+            )
+        else:
+            default_series_id = set_serie_info or ""
+
         print(f"[seed_tcgdex_cards] {set_obj.name}: {len(cards)} cartas")
         for card in cards:
             try:
@@ -78,6 +91,14 @@ def _import_sets(set_ids: Optional[Iterable[str]] = None, lang: str = "pt-br") -
                     series_id = (
                         serie_info.get("id")
                         or serie_info.get("name")
+                        or default_series_id
+                    )
+                else:
+                    series_id = serie_info or default_series_id
+                set_id = card.get("set", {}).get("id") or sid or ""
+                card_id = card.get("localId") or ""
+                image_url = tcgdex_import.build_card_image_url(
+                    card_lang, series_id, set_id, card_id,
                         or ""
                     )
                 else:
@@ -98,8 +119,6 @@ def _import_sets(set_ids: Optional[Iterable[str]] = None, lang: str = "pt-br") -
         except Exception as exc:  # noqa: BLE001
             db.session.rollback()
             print(f"Erro ao commitar set {set_obj.name}: {exc}")
-
-
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Seed de cartas via API TCGdex.",
