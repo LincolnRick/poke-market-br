@@ -3,6 +3,9 @@
 Seed de cartas em Português via API TCGdex.
 
 Uso:
+    python seed_tcgdex_cards.py                     # importa todos os sets
+    python seed_tcgdex_cards.py --sets base1 sv1    # por ID do set
+    python seed_tcgdex_cards.py --sets "rivais predestinados"  # por nome
     python seed_tcgdex_cards.py           # importa todos os sets
     python seed_tcgdex_cards.py --sets sv1 sv2  # importa apenas os sets informados
 """
@@ -10,6 +13,7 @@ Uso:
 from __future__ import annotations
 
 import argparse
+import re
 from typing import Iterable, Optional
 
 from app import create_app
@@ -17,6 +21,36 @@ from db import db
 from scrapers import tcgdex_import
 
 
+def _slugify(text: str) -> str:
+    """Normaliza uma string para comparação simples."""
+    return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+
+
+def _resolve_sets(identifiers: Iterable[str]) -> list[dict]:
+    """Retorna metadados de sets a partir de IDs ou nomes."""
+    all_sets = tcgdex_import.get_all_sets()
+    name_map = {_slugify(s.get("name", "")): s for s in all_sets if s.get("name")}
+
+    result = []
+    for ident in identifiers:
+        ident = ident.strip()
+        data = tcgdex_import.get_set(ident)
+        if data.get("id"):
+            result.append(data)
+            continue
+        # tentativa por nome
+        sid = name_map.get(_slugify(ident), {}).get("id")
+        if sid:
+            result.append(tcgdex_import.get_set(sid))
+        else:
+            print(f"Set não encontrado: {ident}")
+    return result
+
+
+def _import_sets(set_ids: Optional[Iterable[str]] = None) -> None:
+    """Importa sets e cartas usando a API TCGdex."""
+    if set_ids:
+        sets_data = _resolve_sets(set_ids)
 def _import_sets(set_ids: Optional[Iterable[str]] = None) -> None:
     """Importa sets e cartas usando a API TCGdex."""
     if set_ids:
