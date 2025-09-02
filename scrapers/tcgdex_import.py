@@ -104,6 +104,8 @@ def _find_or_create_set(set_data: Dict[str, Any]) -> Set:
 
     series = set_data.get("serie") or set_data.get("series")
     if series:
+        if isinstance(series, dict):
+            series = series.get("name") or series.get("id") or str(series)
         set_obj.series = series
 
     total_cards = set_data.get("total") or set_data.get("totalCards")
@@ -155,6 +157,8 @@ def upsert_set(tcgdex_set: Dict[str, Any]) -> Set:
 
     series = tcgdex_set.get("serie") or tcgdex_set.get("series")
     if series:
+        if isinstance(series, dict):
+            series = series.get("name") or series.get("id") or str(series)
         set_obj.series = series
 
     total_cards = tcgdex_set.get("total") or tcgdex_set.get("totalCards")
