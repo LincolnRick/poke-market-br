@@ -161,8 +161,6 @@ def build_card_image_url(
 ) -> str:
     """Build the card image URL using TCGdex's new asset structure."""
     card_id = str(card_id)
-    if card_id.isdigit():
-        card_id = card_id.zfill(3)
     return f"https://assets.tcgdex.net/{lang}/{serie}/{set_id}/{card_id}/{quality}.{extension}"
 
 
@@ -266,7 +264,9 @@ def save_card_to_db(card_data: Dict[str, Any]) -> None:
 
     lang = card_data.get("language") or "pt-br"
     set_code = set_info.get("id") or ""
-    image_url = build_card_image_url(lang, serie_id, set_code, str(number))
+    image_url = card_data.get("image_url") or build_card_image_url(
+        lang, serie_id, set_code, str(number)
+    )
 
     db.session.flush()  # garante que card.id exista para salvar a imagem
     local_dir = Path("static/cards")
