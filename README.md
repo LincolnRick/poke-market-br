@@ -41,10 +41,8 @@ Crie um arquivo `.env` na raiz com variáveis de ambiente como
 `DB_URL` e `SECRET_KEY`. O banco SQLite local fica em `instance/`.
 
 ### Seeding de cartas
-Scripts de exemplo:
+Importe sets e cartas da distribuição TCGdex clonada localmente:
 ```bash
-python seed_demo.py
-python seed_ligapokemon_cards.py --edids 706 707
 python seed_tcgdex_cards.py --sets base1
 python seed_tcgdex_cards.py --sets "rivais predestinados"
 ```
