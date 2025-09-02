@@ -69,6 +69,11 @@ def process_edid(edid: str, delay_s: float = 0.8) -> None:
             "image_url": ("image", "image_url", "imagem"),
             "hp": ("hp",),
             "category": ("categoria", "category"),
+            "language": ("language", "idioma"),
+            "border": ("border", "borda"),
+            "holo": ("holo",),
+            "material": ("material",),
+            "edition": ("edition", "edicao"),
         }
         for attr, keys in mapping.items():
             for k in keys:
@@ -76,6 +81,9 @@ def process_edid(edid: str, delay_s: float = 0.8) -> None:
                 if v:
                     setattr(card, attr, v)
                     break
+
+        if not getattr(card, "language", None):
+            card.language = "português"
 
     set_obj.total_cards = len(cards)
     db.session.commit()

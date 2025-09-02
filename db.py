@@ -100,6 +100,11 @@ class Card(db.Model):
     resistances: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(db.JSON)
     retreat_cost: Mapped[Optional[List[str]]] = mapped_column(db.JSON)
     flavor_text: Mapped[Optional[str]] = mapped_column(db.Text)
+    language: Mapped[Optional[str]] = mapped_column(db.String(20))
+    border: Mapped[Optional[str]] = mapped_column(db.String(20))
+    holo: Mapped[Optional[str]] = mapped_column(db.String(30))
+    material: Mapped[Optional[str]] = mapped_column(db.String(30))
+    edition: Mapped[Optional[str]] = mapped_column(db.String(30))
 
     set_id: Mapped[int] = mapped_column(
         ForeignKey("sets.id", ondelete="CASCADE"), nullable=False, index=True
@@ -153,6 +158,11 @@ class Card(db.Model):
             "resistances": self.resistances,
             "retreat_cost": self.retreat_cost,
             "flavor_text": self.flavor_text,
+            "language": self.language,
+            "border": self.border,
+            "holo": self.holo,
+            "material": self.material,
+            "edition": self.edition,
             "attacks": [a.as_dict() for a in self.attacks],
             "abilities": [a.as_dict() for a in self.abilities],
             "set": self.set.as_dict() if self.set else None,

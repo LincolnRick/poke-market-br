@@ -168,6 +168,7 @@ def save_card_to_db(card_data: Dict[str, Any]) -> None:
         or (card_data.get("images") or {}).get("large")
         or (card_data.get("images") or {}).get("small")
     )
+    card.language = card_data.get("language") or "português"
 
     prices = card_data.get("prices")
     price_value = _extract_price(prices)
