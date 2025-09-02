@@ -7,6 +7,7 @@ Armazena dados básicos das cartas em um SQLite local.
 from __future__ import annotations
 
 from datetime import date
+from pathlib import Path
 from time import sleep
 from typing import Any, Dict, List, Optional
 
@@ -21,6 +22,12 @@ from db import db, Set, Card, PriceHistory, CardAttack, CardAbility
 
 API_SETS = "https://api.tcgdex.net/v2/pt-br/sets"
 API_CARDS = "https://api.tcgdex.net/v2/pt-br/cards"
+
+# Imagem de placeholder para cartas sem imagem disponível
+PLACEHOLDER_IMG = (
+    "https://claudia.abril.com.br/wp-content/uploads/2020/01/pokemons-do-pokemon-go_6.jpg"
+    "?quality=70&strip=all&w=720&crop=1"
+)
 
 
 session = requests.Session()
@@ -244,7 +251,23 @@ def save_card_to_db(card_data: Dict[str, Any]) -> None:
         or _first_str(images.get("small"))
         or _first_str(images)
     )
-    card.image_url = image_url
+
+    db.session.flush()  # garante que card.id exista para salvar a imagem
+    local_dir = Path("static/cards")
+    local_dir.mkdir(parents=True, exist_ok=True)
+
+    saved_path = PLACEHOLDER_IMG
+    if image_url:
+        try:
+            resp = session.get(image_url, timeout=15)
+            resp.raise_for_status()
+            with open(local_dir / f"{card.id}.jpg", "wb") as f:
+                f.write(resp.content)
+            saved_path = f"cards/{card.id}.jpg"
+        except RequestException as exc:
+            print(f"Erro ao baixar imagem {image_url}: {exc}")
+
+    card.image_url = saved_path
     card.language = card_data.get("language") or "português"
 
     card.hp = card_data.get("hp")
