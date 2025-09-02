@@ -258,14 +258,24 @@ def save_card_to_db(card_data: Dict[str, Any]) -> None:
 
     saved_path = PLACEHOLDER_IMG
     if image_url:
-        try:
-            resp = session.get(image_url, timeout=15)
-            resp.raise_for_status()
-            with open(local_dir / f"{card.id}.jpg", "wb") as f:
-                f.write(resp.content)
-            saved_path = f"cards/{card.id}.jpg"
-        except RequestException as exc:
-            print(f"Erro ao baixar imagem {image_url}: {exc}")
+        urls_to_try = [image_url]
+        base_url = image_url.split("?")[0]
+        if not base_url.lower().endswith((".png", ".jpg", ".jpeg")):
+            urls_to_try.extend([f"{image_url}.png", f"{image_url}.jpg"])
+        last_exc: RequestException | None = None
+        for url in urls_to_try:
+            try:
+                resp = session.get(url, timeout=15)
+                resp.raise_for_status()
+                suffix = ".png" if url.lower().endswith(".png") else ".jpg"
+                with open(local_dir / f"{card.id}{suffix}", "wb") as f:
+                    f.write(resp.content)
+                saved_path = f"cards/{card.id}{suffix}"
+                break
+            except RequestException as exc:
+                last_exc = exc
+        else:
+            print(f"Erro ao baixar imagem {image_url}: {last_exc}")
 
     card.image_url = saved_path
     card.language = card_data.get("language") or "português"
