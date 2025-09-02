@@ -151,6 +151,21 @@ def _find_or_create_set(set_data: Dict[str, Any]) -> Set:
     return set_obj
 
 
+def build_card_image_url(
+    lang: str,
+    serie: str,
+    set_id: str,
+    card_id: str,
+    quality: str = "high",
+    extension: str = "png",
+) -> str:
+    """Build the card image URL using TCGdex's new asset structure."""
+    card_id = str(card_id)
+    if card_id.isdigit():
+        card_id = card_id.zfill(3)
+    return f"https://assets.tcgdex.net/{lang}/{serie}/{set_id}/{card_id}/{quality}.{extension}"
+
+
 def upsert_set(tcgdex_set: Dict[str, Any]) -> Set:
     """Upsert de um Set baseado no JSON retornado pela API."""
     code = tcgdex_set.get("id")
@@ -243,45 +258,29 @@ def save_card_to_db(card_data: Dict[str, Any]) -> None:
     else:
         card.type = None
 
-    images = card_data.get("images") or {}
-    image_url = (
-        _first_str(card_data.get("image"))
-        or _first_str(card_data.get("imageUrl"))
-        or _first_str(images.get("large"))
-        or _first_str(images.get("small"))
-        or _first_str(images)
-    )
+    serie_info = set_info.get("serie") or set_info.get("series") or {}
+    if isinstance(serie_info, dict):
+        serie_id = serie_info.get("id") or serie_info.get("name") or ""
+    else:
+        serie_id = serie_info or ""
+
+    lang = card_data.get("language") or "pt-br"
+    set_code = set_info.get("id") or ""
+    image_url = build_card_image_url(lang, serie_id, set_code, str(number))
 
     db.session.flush()  # garante que card.id exista para salvar a imagem
     local_dir = Path("static/cards")
     local_dir.mkdir(parents=True, exist_ok=True)
 
     saved_path = PLACEHOLDER_IMG
-    if image_url:
-        urls_to_try = [image_url]
-        base_url = image_url.split("?")[0]
-        if not base_url.lower().endswith((".png", ".jpg", ".jpeg")):
-            urls_to_try.extend([f"{base_url}.png", f"{base_url}.jpg"])
-            if "assets.tcgdex.net" in base_url:
-                path = base_url.split("assets.tcgdex.net")[-1]
-                urls_to_try.extend([
-                    f"https://tcgdex.dev/assets{path}.png?ref=assets.tcgdex.net",
-                    f"https://tcgdex.dev/assets{path}.jpg?ref=assets.tcgdex.net",
-                ])
-        last_exc: RequestException | None = None
-        for url in urls_to_try:
-            try:
-                resp = session.get(url, timeout=15)
-                resp.raise_for_status()
-                suffix = ".png" if url.lower().endswith(".png") else ".jpg"
-                with open(local_dir / f"{card.id}{suffix}", "wb") as f:
-                    f.write(resp.content)
-                saved_path = f"cards/{card.id}{suffix}"
-                break
-            except RequestException as exc:
-                last_exc = exc
-        else:
-            print(f"Erro ao baixar imagem {image_url}: {last_exc}")
+    try:
+        resp = session.get(image_url, timeout=15)
+        resp.raise_for_status()
+        with open(local_dir / f"{card.id}.png", "wb") as f:
+            f.write(resp.content)
+        saved_path = f"cards/{card.id}.png"
+    except RequestException as exc:
+        print(f"Erro ao baixar imagem {image_url}: {exc}")
 
     card.image_url = saved_path
     card.language = card_data.get("language") or "português"
