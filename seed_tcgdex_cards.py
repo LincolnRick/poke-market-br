@@ -51,10 +51,6 @@ def _import_sets(set_ids: Optional[Iterable[str]] = None) -> None:
     """Importa sets e cartas usando a API TCGdex."""
     if set_ids:
         sets_data = _resolve_sets(set_ids)
-def _import_sets(set_ids: Optional[Iterable[str]] = None) -> None:
-    """Importa sets e cartas usando a API TCGdex."""
-    if set_ids:
-        sets_data = [tcgdex_import.get_set(sid) for sid in set_ids]
     else:
         # lista básica de sets e busca detalhada de cada um
         sets_list = tcgdex_import.get_all_sets()

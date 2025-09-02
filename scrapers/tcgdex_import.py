@@ -142,6 +142,23 @@ def upsert_set(tcgdex_set: Dict[str, Any]) -> Set:
     return set_obj
 
 
+def _first_str(value: Any) -> Optional[str]:
+    """Retorna a primeira string encontrada em estruturas aninhadas."""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        for v in value.values():
+            result = _first_str(v)
+            if result:
+                return result
+    if isinstance(value, list):
+        for v in value:
+            result = _first_str(v)
+            if result:
+                return result
+    return None
+
+
 def save_card_to_db(card_data: Dict[str, Any]) -> None:
     """Upsert da carta usando (set_id, localId)."""
     set_info = card_data.get("set") or {}
@@ -163,11 +180,16 @@ def save_card_to_db(card_data: Dict[str, Any]) -> None:
         card.type = types[0]
     else:
         card.type = None
-    card.image_url = (
-        card_data.get("image")
-        or (card_data.get("images") or {}).get("large")
-        or (card_data.get("images") or {}).get("small")
+
+    images = card_data.get("images") or {}
+    image_url = (
+        _first_str(card_data.get("image"))
+        or _first_str(card_data.get("imageUrl"))
+        or _first_str(images.get("large"))
+        or _first_str(images.get("small"))
+        or _first_str(images)
     )
+    card.image_url = image_url
     card.language = card_data.get("language") or "português"
 
     prices = card_data.get("prices")
