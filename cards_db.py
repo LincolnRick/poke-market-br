@@ -12,10 +12,25 @@ from sqlalchemy.orm import declarative_base
 
 
 def _get_database_url() -> str:
-    url = os.environ.get("DATABASE_URL")
+    """Resolve database URL used for the TCG cards storage.
+
+    The previous implementation relied on the current working directory,
+    which meant executing the seed script from a different folder would
+    create a brand new database elsewhere.  To keep things consistent with
+    the main project, we look for the same environment variables accepted by
+    ``config.py`` and fall back to a path relative to this file.
+    """
+
+    url = (
+        os.environ.get("DATABASE_URL")
+        or os.environ.get("DB_URL")
+        or os.environ.get("SQLALCHEMY_DATABASE_URI")
+    )
     if url:
         return url
-    db_path = Path("database/poketcg.db")
+
+    root = Path(__file__).resolve().parent
+    db_path = root / "database" / "poketcg.db"
     db_path.parent.mkdir(parents=True, exist_ok=True)
     return f"sqlite:///{db_path.as_posix()}"
 

@@ -51,8 +51,8 @@ pip install -r requirements.txt
 # popula o banco (SQLite local por padrão)
 python seed_tcgdex_cards.py --cards-db-dir ./cards-database --clean
 
-# usando outro banco
-DATABASE_URL=sqlite:///meu.db python seed_tcgdex_cards.py --cards-db-dir ./cards-database
+# usando outro banco (aceita DB_URL, DATABASE_URL ou SQLALCHEMY_DATABASE_URI)
+DB_URL=sqlite:///meu.db python seed_tcgdex_cards.py --cards-db-dir ./cards-database
 ```
 
 O comando acima cria/atualiza a tabela `cards` com os dados dos arquivos
