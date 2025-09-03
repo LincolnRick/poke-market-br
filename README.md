@@ -1,6 +1,6 @@
 # poke-market-br — Gestor de Coleção Pokémon TCG (PT-BR)
 
-Aplicativo estilo **Collectr** voltado para colecionadores do Pokémon TCG
+Aplicativo voltado para colecionadores do Pokémon TCG
 que utilizam cartas impressas oficialmente em Português do Brasil.
 O backend é escrito em Flask + SQLAlchemy com banco SQLite e foco em
 simplicidade para uso local.
@@ -8,8 +8,8 @@ simplicidade para uso local.
 ## Recursos
 - Catálogo PT-BR de cartas, sets e séries
 - Busca por nome, número (ex: `65/82`), set e raridade
-- Coleção e wishlist com possibilidade de exportação em CSV
-- Histórico de preços manual
+- Coleção e wishlist
+- Histórico de preços
 - Seeding de cartas em PT-BR utilizando a API do [TCGdex](https://www.tcgdex.net/)
 
 ## Arquitetura
