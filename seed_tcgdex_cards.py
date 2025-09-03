@@ -27,6 +27,8 @@ def _clean_ts(content: str, set_name: str) -> str:
     content = content.replace("const card: Card =", "const card =")
     # Replace "set: Set" with the actual set name string
     content = re.sub(r"(\bset\s*:\s*)Set\b", rf'\1"{set_name}"', content)
+    # Replace explicit undefined values with null so json5 can parse them
+    content = re.sub(r":\s*undefined", ": null", content)
     # remove prefix/suffix around object
     content = re.sub(r"^\s*const card\s*=\s*", "", content, count=1).strip()
     if content.endswith(";"):
