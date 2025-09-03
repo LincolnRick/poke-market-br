@@ -217,6 +217,15 @@ def upsert_set(tcgdex_set: Dict[str, Any]) -> Set:
     return set_obj
 
 
+def _resolve_localized(raw: Any, lang: str) -> str:
+    """Resolve a localized field to a plain string using ``lang`` fallback to ``en``."""
+    if isinstance(raw, dict):
+        return raw.get(lang) or raw.get("en") or next(iter(raw.values()), "")
+    if raw is None:
+        return ""
+    return str(raw)
+
+
 def _first_str(value: Any) -> Optional[str]:
     """Retorna a primeira string encontrada em estruturas aninhadas."""
     if isinstance(value, str):
@@ -248,7 +257,8 @@ def save_card_to_db(card_data: Dict[str, Any]) -> None:
         card = Card(set_id=set_obj.id, number=number)
         db.session.add(card)
 
-    card.name = card_data.get("name")
+    lang = card_data.get("language") or "pt-br"
+    card.name = _resolve_localized(card_data.get("name"), lang)
     card.rarity = card_data.get("rarity")
     types = card_data.get("types")
     if isinstance(types, list) and types:
@@ -262,7 +272,6 @@ def save_card_to_db(card_data: Dict[str, Any]) -> None:
     else:
         serie_id = serie_info or ""
 
-    lang = card_data.get("language") or "pt-br"
     set_code = set_info.get("id") or ""
     image_url = card_data.get("image_url") or build_card_image_url(
         lang, serie_id, set_code, str(number)
@@ -283,7 +292,7 @@ def save_card_to_db(card_data: Dict[str, Any]) -> None:
         print(f"Erro ao baixar imagem {image_url}: {exc}")
 
     card.image_url = saved_path
-    card.language = card_data.get("language") or "português"
+    card.language = lang or "português"
 
     card.hp = card_data.get("hp")
     card.category = card_data.get("category") or card_data.get("supertype")
@@ -321,7 +330,7 @@ def save_card_to_db(card_data: Dict[str, Any]) -> None:
     if isinstance(attacks, list):
         CardAttack.query.filter_by(card_id=card.id).delete()
         for atk in attacks:
-            name = atk.get("name")
+            name = _resolve_localized(atk.get("name"), lang)
             if not name:
                 continue
             db.session.add(
@@ -330,7 +339,7 @@ def save_card_to_db(card_data: Dict[str, Any]) -> None:
                     name=name,
                     cost=atk.get("cost"),
                     damage=atk.get("damage"),
-                    text=atk.get("text") or atk.get("effect"),
+                    text=_resolve_localized(atk.get("text") or atk.get("effect"), lang),
                 )
             )
 
@@ -338,7 +347,7 @@ def save_card_to_db(card_data: Dict[str, Any]) -> None:
     if isinstance(abilities, list):
         CardAbility.query.filter_by(card_id=card.id).delete()
         for ability in abilities:
-            name = ability.get("name")
+            name = _resolve_localized(ability.get("name"), lang)
             if not name:
                 continue
             db.session.add(
@@ -347,7 +356,7 @@ def save_card_to_db(card_data: Dict[str, Any]) -> None:
                     name=name,
                     cost=ability.get("cost"),
                     damage=ability.get("damage"),
-                    text=ability.get("text") or ability.get("effect"),
+                    text=_resolve_localized(ability.get("text") or ability.get("effect"), lang),
                 )
             )
 

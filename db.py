@@ -183,10 +183,10 @@ class CardAttack(db.Model):
     card_id: Mapped[int] = mapped_column(
         ForeignKey("cards.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    name: Mapped[Dict[str, Any]] = mapped_column(db.JSON, nullable=False)
+    name: Mapped[str] = mapped_column(db.String(200), nullable=False)
     cost: Mapped[Optional[List[str]]] = mapped_column(db.JSON)
     damage: Mapped[Optional[str]] = mapped_column(db.String(50))
-    text: Mapped[Optional[Dict[str, Any]]] = mapped_column(db.JSON)
+    text: Mapped[Optional[str]] = mapped_column(db.Text)
 
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
@@ -214,10 +214,10 @@ class CardAbility(db.Model):
     card_id: Mapped[int] = mapped_column(
         ForeignKey("cards.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    name: Mapped[Dict[str, Any]] = mapped_column(db.JSON, nullable=False)
+    name: Mapped[str] = mapped_column(db.String(200), nullable=False)
     cost: Mapped[Optional[List[str]]] = mapped_column(db.JSON)
     damage: Mapped[Optional[str]] = mapped_column(db.String(50))
-    text: Mapped[Optional[Dict[str, Any]]] = mapped_column(db.JSON)
+    text: Mapped[Optional[str]] = mapped_column(db.Text)
 
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
