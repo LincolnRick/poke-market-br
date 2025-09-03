@@ -47,6 +47,20 @@ python seed_tcgdex_cards.py --sets base1
 python seed_tcgdex_cards.py --sets "rivais predestinados"
 ```
 
+### Importação offline via cards-database
+Também é possível carregar os dados diretamente do repositório
+[`tcgdex/cards-database`](https://github.com/tcgdex/cards-database)
+utilizando o script `load_tcgdex.py`:
+
+```bash
+# Importa todos os sets disponíveis em Português
+python load_tcgdex.py --repo-path ../cards-database --lang pt
+
+# Executa uma atualização incremental desde 2024-01-01 sem gravar no banco
+DATABASE_URL=sqlite:///meu.db python load_tcgdex.py --repo-path ../cards-database \
+    --since 2024-01-01 --dry-run
+```
+
 ## Licença
 Distribuído sob a licença [MIT](LICENSE).
 
