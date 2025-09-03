@@ -192,7 +192,7 @@ def _import_from_cardsdb(
     series_map: Dict[str, str] = {}
     for serie_file in data_root.glob("*.ts"):
         serie_name = serie_file.stem
-        serie_data = _parse_ts_object(serie_file.read_text())
+        serie_data = _parse_ts_object(serie_file.read_text(encoding="utf-8"))
         serie_id = serie_data.get("id") or serie_name.lower()
         series_map[serie_name] = serie_id
 
@@ -204,7 +204,7 @@ def _import_from_cardsdb(
 
         for set_file in serie_dir.glob("*.ts"):
             set_name = set_file.stem
-            set_data = _parse_ts_object(set_file.read_text())
+            set_data = _parse_ts_object(set_file.read_text(encoding="utf-8"))
             sid = set_data.get("id")
             if not sid:
                 continue
@@ -224,7 +224,7 @@ def _import_from_cardsdb(
             print(f"[seed_tcgdex_cards] {set_obj.name}: {len(card_files)} cartas")
             for card_path in card_files:
                 number = card_path.stem
-                card_data = _parse_ts_object(card_path.read_text())
+                card_data = _parse_ts_object(card_path.read_text(encoding="utf-8"))
                 card_data["localId"] = number
                 card_data["id"] = f"{sid}-{number}"
                 card_data["set"] = set_info
