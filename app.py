@@ -124,6 +124,9 @@ def create_app() -> Flask:
     # Importante: habilita pasta `instance/`
     app = Flask(__name__, instance_relative_config=True)
 
+    # Ensure JSON rendering keeps non-ASCII characters
+    app.jinja_env.policies["json.dumps_kwargs"]["ensure_ascii"] = False
+
     # Carrega config base
     app.config.from_object(Config)
     
