@@ -8,7 +8,6 @@ TypeScript da `tcgdex/cards-database`.
 from __future__ import annotations
 
 import argparse
-import json
 import json5
 import re
 from pathlib import Path
@@ -60,15 +59,8 @@ def _process_and_save_card(
     card_data["set"].setdefault("id", sid)
     card_data["set"].setdefault("name", set_info.get("name"))
 
-    # Prevent database errors by converting multilingual dicts to JSON strings
-    if isinstance(card_data.get('name'), dict):
-        card_data['name'] = json.dumps(card_data['name'], ensure_ascii=False)
-    if 'attacks' in card_data and card_data['attacks']:
-        for attack in card_data['attacks']:
-            if isinstance(attack.get('name'), dict):
-                attack['name'] = json.dumps(attack['name'], ensure_ascii=False)
-            if isinstance(attack.get('text'), dict):
-                attack['text'] = json.dumps(attack['text'], ensure_ascii=False)
+    # Language resolution happens in ``save_card_to_db``,
+    # so we keep multilingual fields as dictionaries.
 
     card_data["language"] = lang
     card_data["image_url"] = tcgdex_import.build_card_image_url(
