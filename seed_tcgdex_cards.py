@@ -25,7 +25,8 @@ def _clean_ts(content: str, set_name: str) -> str:
     content = IMPORT_RE.sub("", content)
     content = content.replace("export default card", "")
     content = content.replace("const card: Card =", "const card =")
-    content = re.sub(r"(\bset\s*:\s*)Set\b", rf"\1\"{set_name}\"", content)
+    # Replace "set: Set" with the actual set name string
+    content = re.sub(r"(\bset\s*:\s*)Set\b", rf'\1"{set_name}"', content)
     # remove prefix/suffix around object
     content = re.sub(r"^\s*const card\s*=\s*", "", content, count=1).strip()
     if content.endswith(";"):
