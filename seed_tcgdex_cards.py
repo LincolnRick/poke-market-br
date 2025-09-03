@@ -30,17 +30,52 @@ def _slugify(text: str) -> str:
 # ---------------------------------------------------------------------------
 # PARSING
 def _parse_ts_object(content: str, file_path: Path) -> Dict[str, Any]:
-    """Extracts a JSON-like object from a TypeScript (.ts) file string and parses it."""
+    """Extracts and parses a JSON-like object from a TypeScript file."""
     try:
-        # Find the start of the object (the first '{')
-        start = content.find('{')
-        # Find the end of the object (the last '}')
-        end = content.rfind('}') + 1
-        if start == -1 or end == 0:
+        # Locate the beginning of the exported object. This usually comes after
+        # an ``=`` or ``export default``. Using the first ``{`` directly could
+        # accidentally pick up import statements like ``import { foo }``.
+        match = re.search(r"(=|default)\s*{", content)
+        if not match:
             return {}
-        # Extract only the JSON object string
+
+        start = content.find("{", match.start())
+
+        # Walk the file and capture a balanced JSON object starting at ``start``.
+        depth = 0
+        in_string = False
+        quote_char = ""
+        escape = False
+        end = start
+        for idx in range(start, len(content)):
+            ch = content[idx]
+            if in_string:
+                if escape:
+                    escape = False
+                elif ch == "\\":
+                    escape = True
+                elif ch == quote_char:
+                    in_string = False
+                continue
+
+            if ch in ('"', "'"):
+                in_string = True
+                quote_char = ch
+            elif ch == '{':
+                depth += 1
+            elif ch == '}':
+                depth -= 1
+                if depth == 0:
+                    end = idx + 1
+                    break
+
         json_string = content[start:end]
-        # Use json5 for flexibility (e.g., handles trailing commas)
+
+        # Strip TypeScript specific constructs such as ``as const`` or
+        # ``satisfies SomeType`` which are invalid in JSON.
+        json_string = re.sub(r"\b(as|satisfies)\b[^,}\]]*", "", json_string)
+
+        # Use json5 for flexibility (it supports comments and trailing commas).
         return json5.loads(json_string)
     except Exception as e:
         print(
