@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import os
 import re
+import json
 from datetime import datetime
 from io import StringIO
 import csv
@@ -30,7 +31,13 @@ from flask import (
     abort,
     Response,
 )
-from sqlalchemy import func, distinct
+from sqlalchemy import func, distinct, select, cast, Integer
+from sqlalchemy.orm import Session
+
+from cards_db import Card as TcgCard, Base as TcgBase, get_engine as get_cards_engine
+
+cards_engine = get_cards_engine()
+TcgBase.metadata.create_all(cards_engine)
 
 from config import Config
 from db import (
@@ -207,8 +214,9 @@ def create_app() -> Flask:
     # -------------------------------------------------------------------------
     # Buscar cartas (catálogo local + auto-import por número/nome)
     # -------------------------------------------------------------------------
-    @app.route("/cards")
-    def cards():
+    # Rota legada de busca de cartas
+    @app.route("/cards-old")
+    def cards_old():
         q = (request.args.get("q") or "").strip()
         set_id = (request.args.get("set_id") or "").strip()
         rarity = (request.args.get("rarity") or "").strip()
@@ -298,6 +306,93 @@ def create_app() -> Flask:
             only_missing=only_missing,
         )
 
+
+    # -------------------------------------------------------------------------
+    # TCGdex cards viewer
+    # -------------------------------------------------------------------------
+
+    @app.get("/cards")
+    def cards():
+        series = (request.args.get("series") or "").strip()
+        set_name = (request.args.get("set") or "").strip()
+        q = (request.args.get("q") or "").strip()
+
+        with Session(cards_engine) as session:
+            stmt = select(TcgCard)
+            if series:
+                stmt = stmt.where(TcgCard.series_name == series)
+            if set_name:
+                stmt = stmt.where(TcgCard.set_name == set_name)
+            if q:
+                like = f"%{q}%"
+                stmt = stmt.where(
+                    (TcgCard.name_pt.ilike(like)) | (TcgCard.name_en.ilike(like))
+                )
+            stmt = stmt.order_by(
+                TcgCard.series_name,
+                TcgCard.set_name,
+                cast(TcgCard.file_local_id, Integer),
+                TcgCard.file_local_id,
+            )
+            cards_list = session.scalars(stmt).all()
+            series_list = session.scalars(
+                select(TcgCard.series_name).distinct().order_by(TcgCard.series_name)
+            ).all()
+            set_list = session.scalars(
+                select(TcgCard.set_name).distinct().order_by(TcgCard.set_name)
+            ).all()
+
+        return render_template(
+            "cards.html",
+            cards=cards_list,
+            series_list=series_list,
+            set_list=set_list,
+            series=series,
+            set_name=set_name,
+            q=q,
+        )
+
+    @app.get("/api/cards")
+    def api_cards():
+        series = (request.args.get("series") or "").strip()
+        set_name = (request.args.get("set") or "").strip()
+        q = (request.args.get("q") or "").strip()
+
+        with Session(cards_engine) as session:
+            stmt = select(TcgCard)
+            if series:
+                stmt = stmt.where(TcgCard.series_name == series)
+            if set_name:
+                stmt = stmt.where(TcgCard.set_name == set_name)
+            if q:
+                like = f"%{q}%"
+                stmt = stmt.where(
+                    (TcgCard.name_pt.ilike(like)) | (TcgCard.name_en.ilike(like))
+                )
+            stmt = stmt.order_by(
+                TcgCard.series_name,
+                TcgCard.set_name,
+                cast(TcgCard.file_local_id, Integer),
+                TcgCard.file_local_id,
+            )
+            rows = session.scalars(stmt).all()
+            payload = []
+            for c in rows:
+                types = json.loads(c.types_json) if c.types_json else None
+                payload.append(
+                    {
+                        "id": c.id,
+                        "series_name": c.series_name,
+                        "set_name": c.set_name,
+                        "file_local_id": c.file_local_id,
+                        "name_en": c.name_en,
+                        "name_pt": c.name_pt,
+                        "rarity": c.rarity,
+                        "category": c.category,
+                        "types": types,
+                    }
+                )
+        return jsonify(payload)
 
     # -------------------------------------------------------------------------
     # Coleção
@@ -670,9 +765,9 @@ def create_app() -> Flask:
     # -------------------------------------------------------------------------
     # API leve (auto-complete / integrações) + Histórico de preços (manual)
     # -------------------------------------------------------------------------
-    @app.get("/api/cards")
+    @app.get("/api/cards-old")
     @app.get("/search")
-    def api_cards():
+    def api_cards_old():
         q = (request.args.get("q") or "").strip()
         series = (request.args.get("series") or "").strip()
         category = (request.args.get("category") or "").strip()

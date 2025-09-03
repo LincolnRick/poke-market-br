@@ -1,236 +1,62 @@
 {% extends "layout.html" %}
-{% block title %}Buscar cartas • Collectr{% endblock %}
+{% block title %}Cards{% endblock %}
 
 {% block content %}
-<section class="max-w-[1100px] mx-auto">
-  <header class="mb-4">
-    <h1 class="text-2xl font-semibold">Buscar cartas</h1>
-    <p class="text-slate-500 text-sm mt-1">
-      Para agilizar, use <b>Adicionar por número</b> (ex.: <code>65/82</code>). Caso a carta não exista no catálogo local, será exibida uma mensagem de erro.
-    </p>
-  </header>
-
-  <!-- ALERTAS (flash) -->
-  {% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-      <div class="space-y-2 mb-4">
-        {% for category, message in messages %}
-          <div class="rounded-lg px-3 py-2 {% if category == 'error' %}bg-red-50 text-red-700 border border-red-200{% elif category == 'warning' %}bg-amber-50 text-amber-800 border border-amber-200{% elif category == 'success' %}bg-emerald-50 text-emerald-800 border border-emerald-200{% else %}bg-slate-50 text-slate-700 border border-slate-200{% endif %}">
-            {{ message }}
-          </div>
-        {% endfor %}
-      </div>
-    {% endif %}
-  {% endwith %}
-
-  <!-- ADICIONAR POR NÚMERO (X/Y) -->
-  <div class="card p-3 mb-4">
-    <h2 class="font-semibold mb-2">Adicionar por número (X/Y)</h2>
-    <form method="post" action="{{ url_for('collection_add') }}" class="grid grid-cols-1 md:grid-cols-6 gap-3 items-end">
-      <div class="md:col-span-2">
-        <label class="text-xs text-slate-600">Número impresso</label>
-        <input type="text" name="number" placeholder="ex.: 65/82" required>
-      </div>
-      <div class="md:col-span-2">
-        <label class="text-xs text-slate-600">Set (opcional)</label>
-        <input type="text" name="set_code" placeholder="ex.: sm9, base1, sv6">
-      </div>
-      <div>
-        <label class="text-xs text-slate-600">Qtd</label>
-        <input type="number" name="quantity" min="1" value="1">
-      </div>
-      <div>
-        <label class="text-xs text-slate-600">Cond</label>
-        <select name="condition">
-          {% set conds = ["NM","LP","MP","HP","DMG"] %}
-          {% for opt in conds %}
-            <option value="{{ opt }}">{{ opt }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="md:col-span-6">
-        <button class="btn">Adicionar</button>
-      </div>
-    </form>
-    <p class="text-[12px] text-slate-500 mt-2">
-      Dica: se houver múltiplas cartas com o mesmo número em sets diferentes, informe o <b>Set</b> (código oficial da API, ex.: <code>sm9</code> para Team Up).
-    </p>
-  </div>
-
-  <!-- BUSCAR POR NOME -->
-  <form method="get" action="{{ url_for('cards') }}" class="card p-3 mb-4">
-    <div class="grid grid-cols-1 md:grid-cols-7 gap-3">
-      <div class="md:col-span-2">
-        <label class="text-xs text-slate-600">Buscar por nome</label>
-        <input
-          type="text"
-          name="q"
-          value="{{ q or '' }}"
-          placeholder="Ex.: Psyduck, Charizard..."
-          class="w-full"
-          autocomplete="off"
-        >
-      </div>
-
-      <div>
-        <label class="text-xs text-slate-600">Set</label>
-        <select name="set_id" class="w-full">
-          <option value="">Todos</option>
-          {% for s in sets %}
-            <option value="{{ s.id }}" {% if set_id|int(default=0) == s.id %}selected{% endif %}>{{ s.name }}</option>
-          {% endfor %}
-        </select>
-      </div>
-
-      <div>
-        <label class="text-xs text-slate-600">Raridade</label>
-        <select name="rarity" class="w-full">
-          <option value="">Todas</option>
-          {% for r in rarities %}
-            <option value="{{ r }}" {% if (rarity or '') == r %}selected{% endif %}>{{ r }}</option>
-          {% endfor %}
-        </select>
-      </div>
-
-      <div>
-        <label class="text-xs text-slate-600">Série</label>
-        <select name="series" class="w-full">
-          <option value="">Todas</option>
-          {% for s in series_list %}
-            <option value="{{ s }}" {% if (series or '') == s %}selected{% endif %}>{{ s }}</option>
-          {% endfor %}
-        </select>
-      </div>
-
-      <div>
-        <label class="text-xs text-slate-600">Categoria</label>
-        <select name="category" class="w-full">
-          <option value="">Todas</option>
-          {% for c in categories %}
-            <option value="{{ c }}" {% if (category or '') == c %}selected{% endif %}>{{ c }}</option>
-          {% endfor %}
-        </select>
-      </div>
-
-      <div>
-        <label class="text-xs text-slate-600">HP</label>
-        <input type="number" name="hp" value="{{ hp or '' }}" class="w-full">
-      </div>
-
-      <div class="md:col-span-2 flex items-end gap-3">
-        <label class="inline-flex items-center gap-2">
-          <input type="checkbox" name="only_missing" {% if only_missing %}checked{% endif %}>
-          <span class="text-sm">Apenas não possuídas</span>
-        </label>
-        <button class="btn">Buscar</button>
-        <a href="{{ url_for('cards') }}" class="btn btn-soft">Limpar</a>
-      </div>
-    </div>
-  </form>
-
-  <!-- RESULTADOS -->
-  {% if results and results|length > 0 %}
-    <div class="flex items-center justify-between mb-2">
-      <div class="text-sm text-slate-500">
-        {{ results|length }} resultado{{ 's' if results|length != 1 else '' }}
-        {% if q %} para <b>"{{ q }}"</b>{% endif %}
-        {% if set_id %} • Set filtrado{% endif %}
-        {% if rarity %} • Raridade: {{ rarity }}{% endif %}
-        {% if series %} • Série: {{ series }}{% endif %}
-        {% if category %} • Categoria: {{ category }}{% endif %}
-        {% if hp %} • HP: {{ hp }}{% endif %}
-        {% if only_missing %} • Apenas não possuídas{% endif %}
-      </div>
-    </div>
-
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-      {% for c in results %}
-        <article class="card p-3">
-          <div class="relative">
-            {% if c.image_url %}
-              {% if c.image_url.startswith('http') %}
-                <img src="{{ c.image_url }}" alt="Imagem de {{ c.name }}" class="w-full aspect-[3/4] object-cover rounded-xl">
-              {% else %}
-                <img src="{{ url_for('static', filename=c.image_url) }}" alt="Imagem de {{ c.name }}" class="w-full aspect-[3/4] object-cover rounded-xl">
-              {% endif %}
-            {% else %}
-              <div class="w-full aspect-[3/4] rounded-xl" style="background:#dfecc4; display:grid; place-items:center; color:#2c452c;">sem imagem</div>
-            {% endif %}
-          </div>
-
-          <div class="mt-3">
-            <h3 class="font-semibold leading-tight truncate" title="{{ c.name }}">{{ c.name }}</h3>
-            <p class="text-xs text-slate-500 truncate">
-              {% if c.set %}<a href="{{ url_for('set_view', set_id=c.set.id) }}" class="underline hover:no-underline">{{ c.set.name }}</a>{% else %}—{% endif %} • #{{ c.number or '—' }}{% if c.rarity %} • {{ c.rarity }}{% endif %}{% if c.hp %} • HP {{ c.hp }}{% endif %}{% if c.category %} • {{ c.category }}{% endif %}
-            </p>
-            {% if c.type or c.subtypes %}
-              <p class="text-xs text-slate-500 truncate">
-                {% if c.type %}{{ c.type }}{% endif %}{% if c.subtypes %} • {{ c.subtypes|join(', ') }}{% endif %}
-              </p>
-            {% endif %}
-            {% if c.language or c.border or c.holo or c.material or c.edition %}
-              <p class="text-xs text-slate-500 truncate">
-                {% if c.language %}{{ c.language }}{% endif %}{% if c.border %} • Borda {{ c.border }}{% endif %}{% if c.holo %} • {{ c.holo }}{% endif %}{% if c.material %} • {{ c.material }}{% endif %}{% if c.edition %} • {{ c.edition }}{% endif %}
-              </p>
-            {% endif %}
-            {% if c.attacks %}
-              <ul class="mt-1 text-[11px] text-slate-500 leading-tight">
-                {% for a in c.attacks %}
-                  <li>{{ a.name }}{% if a.damage %} — {{ a.damage }}{% endif %}</li>
-                {% endfor %}
-              </ul>
-            {% endif %}
-          </div>
-
-          <form action="{{ url_for('collection_add') }}" method="post" class="mt-3 grid grid-cols-6 gap-2 items-end">
-            <input type="hidden" name="card_id" value="{{ c.id }}">
-            <div class="col-span-2">
-              <label class="text-xs text-slate-600">Qtd</label>
-              <input type="number" name="quantity" min="1" value="1">
-            </div>
-            <div class="col-span-2">
-              <label class="text-xs text-slate-600">Cond</label>
-              <select name="condition">
-                {% set conds = ["NM","LP","MP","HP","DMG"] %}
-                {% for opt in conds %}
-                  <option value="{{ opt }}">{{ opt }}</option>
-                {% endfor %}
-              </select>
-            </div>
-            <div class="col-span-2">
-              <button class="btn w-full">Adicionar</button>
-            </div>
-          </form>
-
-          <!-- wishlist quick-add -->
-          <form action="{{ url_for('wishlist_add') }}" method="post" class="mt-2 grid grid-cols-6 gap-2 items-end">
-            <input type="hidden" name="card_id" value="{{ c.id }}">
-            <div class="col-span-4">
-              <label class="text-xs text-slate-600">Preço-alvo (opcional)</label>
-              <input type="number" name="target_price" min="0" step="0.01" placeholder="ex.: 49.90">
-            </div>
-            <div class="col-span-2">
-              <button class="btn w-full btn-outline">Wishlist</button>
-            </div>
-          </form>
-        </article>
+<h1 class="text-2xl font-semibold mb-4">Cards</h1>
+<form method="get" class="mb-4 flex flex-wrap gap-2 items-end">
+  <label class="text-sm">Série
+    <select name="series" class="ml-2 border p-1">
+      <option value="">Todas</option>
+      {% for s in series_list %}
+        <option value="{{ s }}" {% if series==s %}selected{% endif %}>{{ s }}</option>
       {% endfor %}
-    </div>
-  {% else %}
-    <div class="card p-6">
-      <p class="text-slate-600">
-        Nenhuma carta listada aqui ainda.
-        {% if q %}
-          <br>Se você buscou por <b>nome</b>, tente outras variações (ex.: sem acentos).
-        {% else %}
-          <br>Use <b>Adicionar por número</b> acima para inserir cartas rapidamente (ex.: <code>65/82</code>).
-        {% endif %}
-      </p>
-    </div>
-  {% endif %}
-</section>
-{% endblock %}
+    </select>
+  </label>
+  <label class="text-sm">Set
+    <select name="set" class="ml-2 border p-1">
+      <option value="">Todos</option>
+      {% for s in set_list %}
+        <option value="{{ s }}" {% if set_name==s %}selected{% endif %}>{{ s }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label class="text-sm">Busca
+    <input type="text" name="q" value="{{ q or '' }}" class="ml-2 border p-1">
+  </label>
+  <button class="btn">Filtrar</button>
+</form>
 
-{% block scripts %}
-<!-- Nenhum JS especial: formulários postam normalmente -->
+<table class="w-full text-sm border-collapse">
+  <thead>
+    <tr class="border-b">
+      <th class="text-left p-2">Nome PT</th>
+      <th class="text-left p-2">Nome EN</th>
+      <th class="text-left p-2">Série</th>
+      <th class="text-left p-2">Set</th>
+      <th class="text-left p-2">Raridade</th>
+      <th class="text-left p-2">Categoria</th>
+      <th class="text-left p-2">JSON</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for c in cards %}
+    <tr class="border-b align-top">
+      <td class="p-2">{{ c.name_pt or '' }}</td>
+      <td class="p-2">{{ c.name_en or '' }}</td>
+      <td class="p-2">{{ c.series_name }}</td>
+      <td class="p-2">{{ c.set_name }}</td>
+      <td class="p-2">{{ c.rarity or '' }}</td>
+      <td class="p-2">{{ c.category or '' }}</td>
+      <td class="p-2"><button type="button" onclick="toggle('j{{ loop.index }}')" class="text-blue-600 underline">ver JSON</button></td>
+    </tr>
+    <tr id="j{{ loop.index }}" style="display:none">
+      <td colspan="7" class="p-2"><pre>{{ c.data_json | tojson(indent=2, ensure_ascii=False) }}</pre></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<script>
+function toggle(id){var e=document.getElementById(id);e.style.display=e.style.display==='none'?'table-row':'none';}
+</script>
 {% endblock %}
