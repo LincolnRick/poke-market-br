@@ -40,26 +40,35 @@ flask --app app run  # ou `python app.py`
 Crie um arquivo `.env` na raiz com variáveis de ambiente como
 `DB_URL` e `SECRET_KEY`. O banco SQLite local fica em `instance/`.
 
-### Seeding de cartas
-Importe sets e cartas da distribuição TCGdex clonada localmente:
-```bash
-python seed_tcgdex_cards.py --sets base1
-python seed_tcgdex_cards.py --sets "rivais predestinados"
-```
-
-### Importação offline via cards-database
-Também é possível carregar os dados diretamente do repositório
-[`tcgdex/cards-database`](https://github.com/tcgdex/cards-database)
-utilizando o script `load_tcgdex.py`:
+### Seeder offline via cards-database
+Os dados oficiais de cartas são lidos da pasta local `cards-database` (mesma
+estrutura do repositório [`tcgdex/cards-database`](https://github.com/tcgdex/cards-database)).
 
 ```bash
-# Importa todos os sets disponíveis em Português
-python load_tcgdex.py --repo-path ../cards-database --lang pt
+# instala dependências
+pip install -r requirements.txt
 
-# Executa uma atualização incremental desde 2024-01-01 sem gravar no banco
-DATABASE_URL=sqlite:///meu.db python load_tcgdex.py --repo-path ../cards-database \
-    --since 2024-01-01 --dry-run
+# popula o banco (SQLite local por padrão)
+python seed_tcgdex_cards.py --cards-db-dir ./cards-database --clean
+
+# usando outro banco
+DATABASE_URL=sqlite:///meu.db python seed_tcgdex_cards.py --cards-db-dir ./cards-database
 ```
+
+O comando acima cria/atualiza a tabela `cards` com os dados dos arquivos
+TypeScript. Para um banco Postgres, defina `DATABASE_URL` e instale
+`psycopg2-binary`.
+
+### Página `/cards`
+Depois de rodar o seeder, execute a aplicação normalmente:
+
+```bash
+python app.py
+```
+
+Visite `http://localhost:5000/cards` para navegar pelas cartas utilizando os
+filtros de série, set ou busca textual. Também há o endpoint JSON em
+`/api/cards` com os mesmos parâmetros (`series`, `set`, `q`).
 
 ## Licença
 Distribuído sob a licença [MIT](LICENSE).
