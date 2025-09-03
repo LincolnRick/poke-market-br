@@ -50,7 +50,7 @@
       <td class="p-2"><button type="button" onclick="toggle('j{{ loop.index }}')" class="text-blue-600 underline">ver JSON</button></td>
     </tr>
     <tr id="j{{ loop.index }}" style="display:none">
-      <td colspan="7" class="p-2"><pre>{{ c.data_json | tojson(indent=2, ensure_ascii=False) }}</pre></td>
+      <td colspan="7" class="p-2"><pre>{{ c.data_json | tojson(indent=2) }}</pre></td>
     </tr>
     {% endfor %}
   </tbody>
